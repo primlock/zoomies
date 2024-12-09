@@ -8,20 +8,20 @@ This [blog](https://about.netflix.com/en/news/fast-com-now-measures-latency-and-
 
 ### TODO's
 
-[*] Implement the code to get a token from the web page
-[*] Define a structure for the JSON object representing the client and the target.
-[*] Remove the unicode insertion in the JSON object and test to see if we can download the speedtest file from our returned JSON object target link.
+- [x] Implement the code to get a token from the web page
+- [x] Define a structure for the JSON object representing the client and the target.
+- [x] Remove the unicode insertion in the JSON object and test to see if we can download the speedtest file from our returned JSON object target link.
     - \u0026 is being inserted. That is the unicode character for &.
     - Replacing the \u0026 allows us to download the file.
-[*] Extract the query components from the target URL 
-[*] Insert the extracted query components into the struct
-[ ] Create a Test Configuration structure that can be reused for upload and download
-    [ ] Implement the config
-[ ] Do the upload and download tests concurrently
-    [ ] Research and implement context
-[*] Implement a CLI library to run the speed tests
-    [*] Define options for the users to configure before running the test
-[ ] Provide your own custom list of servers
+- [x] Extract the query components from the target URL 
+- [x] Insert the extracted query components into the struct
+- [ ] Create a Test Configuration structure that can be reused for upload and download
+    - [ ] Implement the config
+- [ ] Do the upload and download tests concurrently
+    - [ ] Research and implement context
+- [x] Implement a CLI library to run the speed tests
+    - [x] Define options for the users to configure before running the test
+- [ ] Provide your own custom list of servers
 
 ### Targets Object
 
