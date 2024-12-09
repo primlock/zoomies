@@ -33,7 +33,6 @@ type TestConfig struct {
 	TimeoutSeconds   int
 	DownloadRequests int
 	UploadRequests   int
-	PayloadSize      int
 }
 
 // Possibly move this into a local scope: RunE
@@ -44,15 +43,18 @@ var opts = &Options{
 	RunUploadTest:   true,
 	Config: TestConfig{
 		TimeoutSeconds:   30,
-		DownloadRequests: 5,                // How many GET requests to make to the server
-		UploadRequests:   5,                // How many POST requests to make to the server
-		PayloadSize:      25 * 1024 * 1024, // 25 MB Payload (upper limit)
+		DownloadRequests: 5, // How many GET requests to make to the server
+		UploadRequests:   5, // How many POST requests to make to the server
 	},
 }
 
 var (
 	ErrURLCountOutOfBounds = errors.New("count must be in the range 1-5 inclusive")
 	ErrUnknownAppToken     = errors.New("invalid token passed as a parameter")
+)
+
+const (
+	UploadTestPayloadSize = 25 * 1024 * 1024 // 25 MB
 )
 
 var cmd = &cobra.Command{
@@ -168,7 +170,7 @@ func runDownloadTest(servers []api.Server) error {
 }
 
 func runUploadTest(servers []api.Server) error {
-	payload, err := api.GeneratePayload(opts.Config.PayloadSize)
+	payload, err := api.GeneratePayload(UploadTestPayloadSize)
 	if err != nil {
 		return err
 	}
