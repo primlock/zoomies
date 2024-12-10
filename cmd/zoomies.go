@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/primlock/zoomies/api"
 	"github.com/spf13/cobra"
@@ -30,9 +31,11 @@ type Options struct {
 }
 
 type TestConfig struct {
-	TimeoutSeconds   int
-	DownloadRequests int
-	UploadRequests   int
+	Timeout            int
+	DownloadRequests   int
+	UploadRequests     int
+	Duration           int
+	ConcurrentRequests int
 }
 
 // Possibly move this into a local scope: RunE
@@ -42,9 +45,11 @@ var opts = &Options{
 	RunDownloadTest: true,
 	RunUploadTest:   true,
 	Config: TestConfig{
-		TimeoutSeconds:   30,
-		DownloadRequests: 5, // How many GET requests to make to the server
-		UploadRequests:   5, // How many POST requests to make to the server
+		Timeout:            30,
+		DownloadRequests:   5, // How many GET requests to make to the server
+		UploadRequests:     5, // How many POST requests to make to the server
+		Duration:           5, // The amount of time the download and upload test runs for in seconds
+		ConcurrentRequests: 3, // The number of concurrent HTTP request being made to download and upload
 	},
 }
 
@@ -155,15 +160,15 @@ func runDownloadTest(servers []api.Server) error {
 		}
 
 		// TODO: Turn this into a debug output
-		fmt.Printf("Download testing server: %s", ip)
+		fmt.Printf("Download testing server: %s\n", ip)
 
-		res, err := s.Download(opts.Config.TimeoutSeconds, opts.Config.DownloadRequests)
+		res, err := s.Download(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second)
 		if err != nil {
 			return err
 		}
 
 		// Display the result of the test
-		api.DisplayTestResults(res)
+		fmt.Printf("%.2f Mbps\n", res)
 	}
 
 	return nil
@@ -184,7 +189,7 @@ func runUploadTest(servers []api.Server) error {
 		// TODO: Turn this into a debug output
 		fmt.Printf("Upload testing server: %s", ip)
 
-		res, err := s.Upload(opts.Config.TimeoutSeconds, opts.Config.UploadRequests, payload)
+		res, err := s.Upload(opts.Config.Timeout, opts.Config.UploadRequests, payload)
 		if err != nil {
 			return err
 		}
