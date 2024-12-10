@@ -32,8 +32,6 @@ type Options struct {
 
 type TestConfig struct {
 	Timeout            int
-	DownloadRequests   int
-	UploadRequests     int
 	Duration           int
 	ConcurrentRequests int
 }
@@ -46,8 +44,6 @@ var opts = &Options{
 	RunUploadTest:   true,
 	Config: TestConfig{
 		Timeout:            30,
-		DownloadRequests:   5, // How many GET requests to make to the server
-		UploadRequests:     5, // How many POST requests to make to the server
 		Duration:           5, // The amount of time the download and upload test runs for in seconds
 		ConcurrentRequests: 3, // The number of concurrent HTTP request being made to download and upload
 	},
@@ -187,15 +183,15 @@ func runUploadTest(servers []api.Server) error {
 		}
 
 		// TODO: Turn this into a debug output
-		fmt.Printf("Upload testing server: %s", ip)
+		fmt.Printf("Upload testing server: %s\n", ip)
 
-		res, err := s.Upload(opts.Config.Timeout, opts.Config.UploadRequests, payload)
+		res, err := s.Upload(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second, payload)
 		if err != nil {
 			return err
 		}
 
 		// Display the results of the test
-		api.DisplayTestResults(res)
+		fmt.Printf("%.2f Mbps\n", res)
 	}
 
 	return nil

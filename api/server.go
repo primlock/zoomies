@@ -86,26 +86,52 @@ func (s *Server) Download(requests int, duration time.Duration) (float64, error)
 	}
 }
 
-func (s *Server) Upload(timeout, requests int, payload []byte) ([]float64, error) {
-	client := &http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
-	}
+func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (float64, error) {
+	var total uint64
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
 
-	speeds := make([]float64, 0, requests)
+	// Create a channel for tracking uploads
+	uploadChannel := make(chan struct{}, requests)
 
-	for i := 0; i < requests; i++ {
-		start := time.Now()
-		resp, err := client.Post(s.URL, "application/octet-stream", bytes.NewReader(payload))
+	uploadData := func() {
+		// Generate a request for the URL
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.URL, bytes.NewReader(payload))
 		if err != nil {
-			return nil, fmt.Errorf("upload request %d failed: %w", i+1, err)
+			fmt.Printf("failed to generate http request: %s", err)
 		}
-		resp.Body.Close()
 
-		speed := CalculateMbps(float64(len(payload)), time.Since(start).Seconds())
-		speeds = append(speeds, speed)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				fmt.Printf("failed when making http request: %s", err)
+			}
+		} else {
+			defer resp.Body.Close()
+
+			atomic.AddUint64(&total, uint64(len(payload)))
+
+			// Signal the channel that the upload finished
+			uploadChannel <- struct{}{}
+		}
 	}
 
-	return speeds, nil
+	// Begin the upload goroutines
+	start := time.Now()
+	for i := 0; i < requests; i++ {
+		go uploadData()
+	}
+
+	// Main loop for orchastrating the downloads
+	for {
+		select {
+		case <-ctx.Done():
+			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
+		case <-uploadChannel:
+			// Begin another upload while not timed out
+			go uploadData()
+		}
+	}
 }
 
 // Get the IPv4 of the host URL.
