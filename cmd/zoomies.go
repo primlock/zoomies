@@ -34,6 +34,7 @@ type TestConfig struct {
 	Timeout            int
 	Duration           int
 	ConcurrentRequests int
+	ChunkSize          int64
 }
 
 // Possibly move this into a local scope: RunE
@@ -44,14 +45,16 @@ var opts = &Options{
 	RunUploadTest:   true,
 	Config: TestConfig{
 		Timeout:            30,
-		Duration:           5, // The amount of time the download and upload test runs for in seconds
-		ConcurrentRequests: 3, // The number of concurrent HTTP request being made to download and upload
+		Duration:           3,        // The amount of time the download and upload test runs for in seconds
+		ConcurrentRequests: 3,        // The number of concurrent HTTP request being made to download and upload
+		ChunkSize:          26214400, // The size of the chunk to be downloaded and uploaded in bytes
 	},
 }
 
 var (
-	ErrURLCountOutOfBounds = errors.New("count must be in the range 1-5 inclusive")
-	ErrUnknownAppToken     = errors.New("invalid token passed as a parameter")
+	ErrURLCountOutOfBounds  = errors.New("count must be in the range 1-5 inclusive")
+	ErrUnknownAppToken      = errors.New("invalid token passed as a parameter")
+	ErrChunkSizeOutOfBounds = errors.New("chunk size must be in the range 1-26214400 inclusive")
 )
 
 const (
@@ -65,6 +68,10 @@ var cmd = &cobra.Command{
 
 		if opts.URLCount < 1 || opts.URLCount > 5 {
 			return ErrURLCountOutOfBounds
+		}
+
+		if opts.Config.ChunkSize < 1 || opts.Config.ChunkSize > 26214400 {
+			return ErrChunkSizeOutOfBounds
 		}
 
 		// Gather the required server information
@@ -158,7 +165,12 @@ func runDownloadTest(servers []api.Server) error {
 		// TODO: Turn this into a debug output
 		fmt.Printf("Download testing server: %s\n", ip)
 
-		res, err := s.Download(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second)
+		err = s.SetChunkSize(opts.Config.ChunkSize)
+		if err != nil {
+			return fmt.Errorf("failed to append chunk size: %s", err)
+		}
+
+		res, err := s.Download(opts.Config.ConcurrentRequests, opts.Config.ChunkSize, time.Duration(opts.Config.Duration)*time.Second)
 		if err != nil {
 			return err
 		}
@@ -198,12 +210,15 @@ func runUploadTest(servers []api.Server) error {
 }
 
 func init() {
+	// Options Flags
 	cmd.Flags().StringVarP(&opts.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
 	cmd.Flags().BoolVar(&opts.HTTPSEnabled, "https", opts.HTTPSEnabled, "enable https")
 	cmd.Flags().IntVarP(&opts.URLCount, "count", "c", opts.URLCount, "number of URLs to test (1-5)")
 	cmd.Flags().BoolVar(&opts.RunDownloadTest, "download", opts.RunDownloadTest, "perform the download test")
 	cmd.Flags().BoolVar(&opts.RunUploadTest, "upload", opts.RunUploadTest, "perform the upload test")
-	// TODO: implement flags for TestConfig
+
+	// TestConfig flags
+	cmd.Flags().Int64VarP(&opts.Config.ChunkSize, "chunk", "n", opts.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
 }
 
 func Execute() {

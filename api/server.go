@@ -21,21 +21,24 @@ const (
 )
 
 type Server struct {
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	Location struct {
+	Name          string `json:"name"`
+	URL           string `json:"url"`
+	RangeBasedURL string `json:"rburl"`
+	Location      struct {
 		City    string `json:"city"`
 		Country string `json:"country"`
 	} `json:"location"`
 }
 
-func (s *Server) Download(requests int, duration time.Duration) (float64, error) {
+func (s *Server) Download(requests int, chunk int64, duration time.Duration) (float64, error) {
 	var total uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
+	fmt.Printf("endpoint: %s\n", s.RangeBasedURL)
+
 	// Create a default request for downloading the data
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.RangeBasedURL, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to generate http request: %s", err)
 	}
@@ -49,7 +52,9 @@ func (s *Server) Download(requests int, duration time.Duration) (float64, error)
 		// Send the request
 		resp, err := http.DefaultClient.Do(clone)
 		if err != nil {
-			fmt.Printf("failed when making http request: %s", err)
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				fmt.Printf("failed when making http request: %s", err)
+			}
 		} else {
 			defer resp.Body.Close()
 
@@ -132,6 +137,18 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 			go uploadData()
 		}
 	}
+}
+
+func (s *Server) SetChunkSize(size int64) error {
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		return err
+	}
+
+	p := fmt.Sprintf("/range/0-%d", size)
+	s.RangeBasedURL = u.JoinPath(p).String()
+
+	return nil
 }
 
 // Get the IPv4 of the host URL.
