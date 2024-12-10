@@ -78,7 +78,7 @@ func (s *Server) Download(requests int, duration time.Duration) (float64, error)
 	for {
 		select {
 		case <-ctx.Done():
-			return CalculateMbps(float64(total), time.Since(start).Seconds()), err
+			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-downloadChannel:
 			// Begin another download while not timed out
 			go downloadData()
