@@ -22,7 +22,6 @@ type Options struct {
 	APIEndpointToken string
 	ICMPTest         bool
 	TestServerCount  int
-	HTTPSEnabled     bool
 	RunDownloadTest  bool
 	RunUploadTest    bool
 	Config           TestConfig
@@ -47,7 +46,6 @@ type Candidate struct {
 // Possibly move this into a local scope: RunE
 var opts = &Options{
 	TestServerCount: 5,
-	HTTPSEnabled:    true,
 	ICMPTest:        true,
 	RunDownloadTest: true,
 	RunUploadTest:   true,
@@ -83,7 +81,7 @@ var cmd = &cobra.Command{
 		}
 
 		// Gather the required server information
-		candidates, err := getRemoteServerList(opts.APIEndpointToken, opts.HTTPSEnabled, opts.TestServerCount)
+		candidates, err := getRemoteServerList(opts.APIEndpointToken)
 		if err != nil {
 			return err
 		}
@@ -110,7 +108,7 @@ var cmd = &cobra.Command{
 }
 
 // Get a list of servers from a remote URL.
-func getRemoteServerList(token string, https bool, URLCount int) ([]api.Server, error) {
+func getRemoteServerList(token string) ([]api.Server, error) {
 	// Dynamically retrieve the endpoint token
 	if token == "" {
 		t, err := api.GetAPIEndpointToken()
@@ -122,7 +120,7 @@ func getRemoteServerList(token string, https bool, URLCount int) ([]api.Server, 
 	}
 
 	// Query the remote for the JSON list of the nearest servers
-	resp, err := http.Get(fmt.Sprintf("%s?token=%s&https=%v&urlCount=%d", api.FastSpeedTestServerURL, token, https, URLCount))
+	resp, err := http.Get(fmt.Sprintf("%s?token=%s&https=true", api.FastSpeedTestServerURL, token))
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +266,6 @@ func runUploadTest(servers []api.Server) error {
 func init() {
 	// Options Flags
 	cmd.Flags().StringVarP(&opts.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
-	cmd.Flags().BoolVar(&opts.HTTPSEnabled, "https", opts.HTTPSEnabled, "enable https")
 	cmd.Flags().IntVarP(&opts.TestServerCount, "count", "c", opts.TestServerCount, "number of servers to perform testing on")
 	cmd.Flags().BoolVar(&opts.RunDownloadTest, "download", opts.RunDownloadTest, "perform the download test")
 	cmd.Flags().BoolVar(&opts.RunUploadTest, "upload", opts.RunUploadTest, "perform the upload test")
