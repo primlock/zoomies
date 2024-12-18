@@ -144,7 +144,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 }
 
 func (s *Server) SetChunkSize(size int64) error {
-	u, err := url.Parse(s.URL)
+	u, err := s.GetURL()
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (s *Server) SetChunkSize(size int64) error {
 
 // Get the IPv4 of the host URL.
 func (s *Server) GetIPv4() (string, error) {
-	u, err := url.Parse(s.URL)
+	u, err := s.GetURL()
 	if err != nil {
 		return "", err
 	}
