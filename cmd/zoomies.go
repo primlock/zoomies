@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/primlock/zoomies/api"
@@ -19,7 +20,7 @@ type RemoteServerResponse struct {
 
 type Options struct {
 	APIEndpointToken string
-	URLCount         int
+	TestServerCount  int
 	HTTPSEnabled     bool
 	RunDownloadTest  bool
 	RunUploadTest    bool
@@ -37,9 +38,14 @@ type TestConfig struct {
 	ChunkSize          int64
 }
 
+type Candidate struct {
+	Server api.Server
+	RTT    time.Duration
+}
+
 // Possibly move this into a local scope: RunE
 var opts = &Options{
-	URLCount:        5,
+	TestServerCount: 5,
 	HTTPSEnabled:    true,
 	RunDownloadTest: true,
 	RunUploadTest:   true,
@@ -66,7 +72,7 @@ var cmd = &cobra.Command{
 	Short: "zoomies is a network speed measurement tool",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if opts.URLCount < 1 || opts.URLCount > 5 {
+		if opts.TestServerCount < 1 || opts.TestServerCount > 5 {
 			return ErrURLCountOutOfBounds
 		}
 
@@ -75,7 +81,13 @@ var cmd = &cobra.Command{
 		}
 
 		// Gather the required server information
-		servers, err := getRemoteServerList(opts.APIEndpointToken, opts.HTTPSEnabled, opts.URLCount)
+		candidates, err := getRemoteServerList(opts.APIEndpointToken, opts.HTTPSEnabled, opts.TestServerCount)
+		if err != nil {
+			return err
+		}
+
+		// Narrow down the list of server to the one with the lowest RTT.
+		servers, err := getLowestRTTServers(candidates, opts.TestServerCount, api.ICMPProbe)
 		if err != nil {
 			return err
 		}
@@ -134,6 +146,40 @@ func getRemoteServerList(token string, https bool, URLCount int) ([]api.Server, 
 }
 
 // TODO: Get a list of servers from a local file: func getLocalServerList() ([]api.Server, error)
+
+// Determine the testing servers by evaluating the lowest round-trip times (RTT). The number
+// of servers returned is limited by 'count' and the type of probe is determined by 'pf'.
+func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) ([]api.Server, error) {
+	if len(candidates) < count {
+		count = len(candidates)
+	}
+
+	// Get the RTT of each server and store it in our Candidate struct for sorting.
+	s := make([]Candidate, 0, len(candidates))
+	for i := 0; i < len(candidates); i++ {
+		rtt, err := pf(candidates[i], 1)
+
+		if err != nil {
+			return nil, err
+		}
+
+		s = append(s, Candidate{Server: candidates[i], RTT: rtt})
+	}
+
+	// Sort by RTT (ascending)
+	sort.Slice(s, func(i, j int) bool {
+		return s[i].RTT < s[j].RTT
+	})
+
+	// Hold only the top N lowest RTT servers.
+	servers := make([]api.Server, count)
+	for i := 0; i < count; i++ {
+		servers[i] = s[i].Server
+		fmt.Printf("Server: %s - RTT: %s\n", servers[i].Location, s[i].RTT)
+	}
+
+	return servers, nil
+}
 
 func runTestSuite(servers []api.Server) error {
 	if opts.RunDownloadTest {
@@ -213,7 +259,7 @@ func init() {
 	// Options Flags
 	cmd.Flags().StringVarP(&opts.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
 	cmd.Flags().BoolVar(&opts.HTTPSEnabled, "https", opts.HTTPSEnabled, "enable https")
-	cmd.Flags().IntVarP(&opts.URLCount, "count", "c", opts.URLCount, "number of URLs to test (1-5)")
+	cmd.Flags().IntVarP(&opts.TestServerCount, "count", "c", opts.TestServerCount, "number of servers to perform testing on")
 	cmd.Flags().BoolVar(&opts.RunDownloadTest, "download", opts.RunDownloadTest, "perform the download test")
 	cmd.Flags().BoolVar(&opts.RunUploadTest, "upload", opts.RunUploadTest, "perform the upload test")
 

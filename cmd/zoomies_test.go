@@ -3,8 +3,11 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
+	"github.com/primlock/zoomies/api"
 	"gotest.tools/v3/assert"
 )
 
@@ -76,6 +79,63 @@ func TestChunkSizeOutOfBounds(t *testing.T) {
 			got := cmd.Execute()
 
 			assert.Error(t, got, tt.expected.Error())
+		})
+	}
+}
+
+var mockRTT time.Duration = 20
+
+func mockProbeFunc(server api.Server, count int) (time.Duration, error) {
+	mockRTT += 20
+	return mockRTT, nil
+}
+
+func TestGetLowestRTTServers(t *testing.T) {
+	testCases := []struct {
+		name       string
+		candidates []api.Server
+		count      int
+		probeFunc  api.ProbeFunc
+		expected   []string
+	}{
+		{
+			name: "Top 2 Servers with the Lowest RTT",
+			candidates: []api.Server{
+				{Name: "server1"},
+				{Name: "server2"},
+				{Name: "server3"},
+			},
+			count:     2,
+			probeFunc: mockProbeFunc,
+			expected:  []string{"server1", "server2"},
+		},
+		{
+			name: "Request More Servers than Available",
+			candidates: []api.Server{
+				{Name: "server1"},
+				{Name: "server2"},
+			},
+			count:     4,
+			probeFunc: mockProbeFunc,
+			expected:  []string{"server1", "server2"},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getLowestRTTServers(tt.candidates, tt.count, tt.probeFunc)
+			if err != nil {
+				t.Errorf("got unexpected error: %v", err)
+			}
+
+			names := make([]string, len(got))
+			for i, server := range got {
+				names[i] = server.Name
+			}
+
+			if !reflect.DeepEqual(names, tt.expected) {
+				t.Errorf("got %v, want %v", names, tt.expected)
+			}
 		})
 	}
 }

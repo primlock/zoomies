@@ -13,12 +13,16 @@ import (
 	"net/url"
 	"sync/atomic"
 	"time"
+
+	probing "github.com/prometheus-community/pro-bing"
 )
 
 const (
 	FastSpeedTestServerURL = "https://api.fast.com/netflix/speedtest/v2"
 	FastBaseURL            = "https://fast.com"
 )
+
+type ProbeFunc func(server Server, count int) (time.Duration, error)
 
 type Server struct {
 	Name          string `json:"name"`
@@ -164,6 +168,47 @@ func (s *Server) GetIPv4() (string, error) {
 	}
 
 	return ips[0].String(), nil
+}
+
+func (s *Server) GetURL() (*url.URL, error) {
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing url for %s: %w", s.URL, err)
+	}
+
+	return u, nil
+}
+
+// Send a count number of ICMP pings to the server and return the average rtt.
+func (s *Server) ICMPProbe(count int) (time.Duration, error) {
+	u, err := s.GetURL()
+	if err != nil {
+		return 0, err
+	}
+
+	pinger, err := probing.NewPinger(u.Hostname())
+	if err != nil {
+		return 0, fmt.Errorf("error creating pinger for %s: %w", s.Name, err)
+	}
+
+	pinger.Count = count
+
+	err = pinger.Run()
+	if err != nil {
+		return 0, fmt.Errorf("error probing server %s: %w", s.Name, err)
+	}
+
+	stats := pinger.Statistics()
+
+	return stats.AvgRtt, nil
+}
+
+func ICMPProbe(server Server, count int) (time.Duration, error) {
+	return server.ICMPProbe(count)
+}
+
+func HTTPProbe(server Server, count int) (time.Duration, error) {
+	return 0, nil
 }
 
 // Pretty print the JSON object representing the server list.
