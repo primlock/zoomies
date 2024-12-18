@@ -20,6 +20,7 @@ type RemoteServerResponse struct {
 
 type Options struct {
 	APIEndpointToken string
+	ICMPTest         bool
 	TestServerCount  int
 	HTTPSEnabled     bool
 	RunDownloadTest  bool
@@ -47,6 +48,7 @@ type Candidate struct {
 var opts = &Options{
 	TestServerCount: 5,
 	HTTPSEnabled:    true,
+	ICMPTest:        true,
 	RunDownloadTest: true,
 	RunUploadTest:   true,
 	Config: TestConfig{
@@ -87,7 +89,7 @@ var cmd = &cobra.Command{
 		}
 
 		// Narrow down the list of server to the one with the lowest RTT.
-		servers, err := getLowestRTTServers(candidates, opts.TestServerCount, api.ICMPProbe)
+		servers, err := getLowestRTTServers(candidates, opts.TestServerCount, getProbeFunc(opts.ICMPTest))
 		if err != nil {
 			return err
 		}
@@ -181,6 +183,14 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 	return servers, nil
 }
 
+func getProbeFunc(opt bool) api.ProbeFunc {
+	if !opt {
+		return api.HTTPProbe
+	}
+
+	return api.ICMPProbe
+}
+
 func runTestSuite(servers []api.Server) error {
 	if opts.RunDownloadTest {
 		if err := runDownloadTest(servers); err != nil {
@@ -262,6 +272,7 @@ func init() {
 	cmd.Flags().IntVarP(&opts.TestServerCount, "count", "c", opts.TestServerCount, "number of servers to perform testing on")
 	cmd.Flags().BoolVar(&opts.RunDownloadTest, "download", opts.RunDownloadTest, "perform the download test")
 	cmd.Flags().BoolVar(&opts.RunUploadTest, "upload", opts.RunUploadTest, "perform the upload test")
+	cmd.Flags().BoolVar(&opts.ICMPTest, "icmp", opts.ICMPTest, "use icmp to determine RTT, use HTTP if false")
 
 	// TestConfig flags
 	cmd.Flags().Int64VarP(&opts.Config.ChunkSize, "chunk", "n", opts.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")

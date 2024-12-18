@@ -203,12 +203,41 @@ func (s *Server) ICMPProbe(count int) (time.Duration, error) {
 	return stats.AvgRtt, nil
 }
 
+func (s *Server) HTTPProbe(count int) (time.Duration, error) {
+	var rtt time.Duration
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("error creating request for %s: %w", s.URL, err)
+	}
+
+	for i := 0; i < count; i++ {
+		start := time.Now()
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return 0, fmt.Errorf("error retrieving response for %s: %w", s.URL, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return 0, fmt.Errorf("unexpected status code %d for %s", resp.StatusCode, s.URL)
+		}
+
+		rtt += time.Since(start)
+	}
+
+	avg := rtt / time.Duration(count)
+	return avg, nil
+}
+
 func ICMPProbe(server Server, count int) (time.Duration, error) {
 	return server.ICMPProbe(count)
 }
 
 func HTTPProbe(server Server, count int) (time.Duration, error) {
-	return 0, nil
+	return server.HTTPProbe(count)
 }
 
 // Pretty print the JSON object representing the server list.
