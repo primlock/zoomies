@@ -45,7 +45,7 @@ type Candidate struct {
 
 // Possibly move this into a local scope: RunE
 var opts = &Options{
-	TestServerCount: 5,
+	TestServerCount: 1,
 	ICMPTest:        true,
 	RunDownloadTest: true,
 	RunUploadTest:   true,
