@@ -51,7 +51,7 @@ var opts = &Options{
 	RunUploadTest:   true,
 	Config: TestConfig{
 		Timeout:            30,
-		Duration:           3,        // The amount of time the download and upload test runs for in seconds
+		Duration:           15,       // The amount of time the download and upload test runs for in seconds
 		ConcurrentRequests: 3,        // The number of concurrent HTTP request being made to download and upload
 		ChunkSize:          26214400, // The size of the chunk to be downloaded and uploaded in bytes
 	},
@@ -175,7 +175,13 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 	servers := make([]api.Server, count)
 	for i := 0; i < count; i++ {
 		servers[i] = s[i].Server
-		fmt.Printf("Server: %s - RTT: %s\n", servers[i].Location, s[i].RTT)
+
+		ip, err := servers[i].GetIPv4()
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Printf("Server: %s (%s, %s)\nPing: %s\n", ip, servers[i].Location.City, servers[i].Location.Country, s[i].RTT)
 	}
 
 	return servers, nil
@@ -211,26 +217,18 @@ func runTestSuite(servers []api.Server) error {
 
 func runDownloadTest(servers []api.Server) error {
 	for _, s := range servers {
-		ip, err := s.GetIPv4()
-		if err != nil {
-			return err
-		}
-
-		// TODO: Turn this into a debug output
-		fmt.Printf("Download testing server: %s\n", ip)
-
-		err = s.SetChunkSize(opts.Config.ChunkSize)
+		err := s.SetChunkSize(opts.Config.ChunkSize)
 		if err != nil {
 			return fmt.Errorf("failed to append chunk size: %s", err)
 		}
 
-		res, err := s.Download(opts.Config.ConcurrentRequests, opts.Config.ChunkSize, time.Duration(opts.Config.Duration)*time.Second)
+		_, err = s.Download(opts.Config.ConcurrentRequests, opts.Config.ChunkSize, time.Duration(opts.Config.Duration)*time.Second)
 		if err != nil {
 			return err
 		}
 
 		// Display the result of the test
-		fmt.Printf("%.2f Mbps\n", res)
+		// fmt.Printf("%.2f Mbps\n", res)
 	}
 
 	return nil
@@ -243,21 +241,13 @@ func runUploadTest(servers []api.Server) error {
 	}
 
 	for _, s := range servers {
-		ip, err := s.GetIPv4()
-		if err != nil {
-			return err
-		}
-
-		// TODO: Turn this into a debug output
-		fmt.Printf("Upload testing server: %s\n", ip)
-
-		res, err := s.Upload(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second, payload)
+		_, err = s.Upload(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second, payload)
 		if err != nil {
 			return err
 		}
 
 		// Display the results of the test
-		fmt.Printf("%.2f Mbps\n", res)
+		// fmt.Printf("%.2f Mbps\n", res)
 	}
 
 	return nil
