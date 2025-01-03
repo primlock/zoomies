@@ -175,13 +175,6 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 	servers := make([]api.Server, count)
 	for i := 0; i < count; i++ {
 		servers[i] = s[i].Server
-
-		ip, err := servers[i].GetIPv4()
-		if err != nil {
-			return nil, err
-		}
-
-		fmt.Printf("Server: %s (%s, %s)\nPing: %s\n", ip, servers[i].Location.City, servers[i].Location.Country, s[i].RTT)
 	}
 
 	return servers, nil
@@ -196,58 +189,58 @@ func getProbeFunc(opt bool) api.ProbeFunc {
 }
 
 func runTestSuite(servers []api.Server) error {
-	if opts.RunDownloadTest {
-		if err := runDownloadTest(servers); err != nil {
-			return err
-		}
-	} else {
-		fmt.Println("Download test is disabled")
-	}
-
-	if opts.RunUploadTest {
-		if err := runUploadTest(servers); err != nil {
-			return err
-		}
-	} else {
-		fmt.Println("Upload test is disabled")
-	}
-
-	return nil
-}
-
-func runDownloadTest(servers []api.Server) error {
 	for _, s := range servers {
-		err := s.SetChunkSize(opts.Config.ChunkSize)
-		if err != nil {
-			return fmt.Errorf("failed to append chunk size: %s", err)
-		}
-
-		_, err = s.Download(opts.Config.ConcurrentRequests, opts.Config.ChunkSize, time.Duration(opts.Config.Duration)*time.Second)
+		// Display the server being tested
+		ip, err := s.GetIPv4()
 		if err != nil {
 			return err
 		}
 
-		// Display the result of the test
-		// fmt.Printf("%.2f Mbps\n", res)
+		fmt.Printf("Server: %s (%s, %s)\n", ip, s.Location.City, s.Location.Country)
+
+		if opts.RunDownloadTest {
+			if err := runDownloadTest(s); err != nil {
+				return err
+			}
+		} else {
+			fmt.Println("Download test is disabled")
+		}
+
+		if opts.RunUploadTest {
+			if err := runUploadTest(s); err != nil {
+				return err
+			}
+		} else {
+			fmt.Println("Upload test is disabled")
+		}
 	}
 
 	return nil
 }
 
-func runUploadTest(servers []api.Server) error {
+func runDownloadTest(server api.Server) error {
+	err := server.SetChunkSize(opts.Config.ChunkSize)
+	if err != nil {
+		return fmt.Errorf("failed to append chunk size: %s", err)
+	}
+
+	_, err = server.Download(opts.Config.ConcurrentRequests, opts.Config.ChunkSize, time.Duration(opts.Config.Duration)*time.Second)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func runUploadTest(server api.Server) error {
 	payload, err := api.GeneratePayload(UploadTestPayloadSize)
 	if err != nil {
 		return err
 	}
 
-	for _, s := range servers {
-		_, err = s.Upload(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second, payload)
-		if err != nil {
-			return err
-		}
-
-		// Display the results of the test
-		// fmt.Printf("%.2f Mbps\n", res)
+	_, err = server.Upload(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second, payload)
+	if err != nil {
+		return err
 	}
 
 	return nil
