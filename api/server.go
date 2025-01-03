@@ -40,11 +40,6 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
-	area, err := pterm.DefaultArea.Start()
-	if err != nil {
-		return 0, fmt.Errorf("failed to start pterm area: %s", err)
-	}
-
 	// Create a default request for downloading the data
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.RangeBasedURL, nil)
 	if err != nil {
@@ -81,23 +76,44 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 		}
 	}
 
+	// Create a channel to update the display
+	displayChannel := make(chan bool)
+
+	ticker := time.NewTicker(200 * time.Millisecond)
+	area, err := pterm.DefaultArea.Start()
+	if err != nil {
+		return 0, err
+	}
+
+	updateDisplay := func(start time.Time) {
+		for {
+			select {
+			case <-displayChannel:
+				return
+			case <-ticker.C:
+				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
+				area.Update(pterm.Sprintf("Download: %.2f Mbps\n", mbps))
+			}
+		}
+	}
+
 	// Begin the concurrent downloads
 	start := time.Now()
 	for i := 0; i < requests; i++ {
 		go downloadData()
 	}
 
+	go updateDisplay(start)
+
 	// Main loop for orchastrating goroutines
 	for {
 		select {
 		case <-ctx.Done():
+			ticker.Stop()
 			area.Stop()
+			displayChannel <- true
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-downloadChannel:
-			// Update the screen with the current speed
-			mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-			area.Update(pterm.Sprintf("Download: %.2f Mbps\n", mbps))
-
 			// Begin another download while not timed out
 			go downloadData()
 		}
@@ -108,11 +124,6 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 	var total uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
-
-	area, err := pterm.DefaultArea.Start()
-	if err != nil {
-		return 0, fmt.Errorf("failed to start pterm area: %s", err)
-	}
 
 	// Create a channel for tracking uploads
 	uploadChannel := make(chan struct{}, requests)
@@ -139,23 +150,44 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 		}
 	}
 
+	// Create a channel to update the display
+	displayChannel := make(chan bool)
+
+	ticker := time.NewTicker(200 * time.Millisecond)
+	area, err := pterm.DefaultArea.Start()
+	if err != nil {
+		return 0, err
+	}
+
+	updateDisplay := func(start time.Time) {
+		for {
+			select {
+			case <-displayChannel:
+				return
+			case <-ticker.C:
+				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
+				area.Update(pterm.Sprintf("Upload: %.2f Mbps\n", mbps))
+			}
+		}
+	}
+
 	// Begin the upload goroutines
 	start := time.Now()
 	for i := 0; i < requests; i++ {
 		go uploadData()
 	}
 
+	go updateDisplay(start)
+
 	// Main loop for orchastrating the downloads
 	for {
 		select {
 		case <-ctx.Done():
+			ticker.Stop()
 			area.Stop()
+			displayChannel <- true
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-uploadChannel:
-			// Update the screen with the current speed
-			mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-			area.Update(pterm.Sprintf("Upload: %.2f Mbps\n", mbps))
-
 			// Begin another upload while not timed out
 			go uploadData()
 		}
