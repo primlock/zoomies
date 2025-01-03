@@ -61,6 +61,7 @@ var (
 	ErrURLCountOutOfBounds  = errors.New("count must be in the range 1-5 inclusive")
 	ErrUnknownAppToken      = errors.New("invalid token passed as a parameter")
 	ErrChunkSizeOutOfBounds = errors.New("chunk size must be in the range 1-26214400 inclusive")
+	ErrDurationOutOfBounds  = errors.New("chunk size must be in the range 1-26214400 inclusive")
 )
 
 const (
@@ -78,6 +79,10 @@ var cmd = &cobra.Command{
 
 		if opts.Config.ChunkSize < 1 || opts.Config.ChunkSize > 26214400 {
 			return ErrChunkSizeOutOfBounds
+		}
+
+		if opts.Config.Duration < 3 || opts.Config.Duration > 30 {
+			return ErrDurationOutOfBounds
 		}
 
 		// Gather the required server information
@@ -256,6 +261,7 @@ func init() {
 
 	// TestConfig flags
 	cmd.Flags().Int64VarP(&opts.Config.ChunkSize, "chunk", "n", opts.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
+	cmd.Flags().IntVarP(&opts.Config.Duration, "duration", "d", opts.Config.Duration, "the length of time each test should run for (3-30 seconds)")
 }
 
 func Execute() {

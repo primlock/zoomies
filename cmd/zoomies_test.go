@@ -139,3 +139,27 @@ func TestGetLowestRTTServers(t *testing.T) {
 		})
 	}
 }
+
+func TestDurationOutOfBounds(t *testing.T) {
+	testCases := []struct {
+		name     string
+		seconds  int
+		expected error
+	}{
+		{name: "Below the lower boundary", seconds: 2, expected: ErrDurationOutOfBounds},
+		{name: "Above the upper boundary", seconds: 35, expected: ErrDurationOutOfBounds},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.SetOutput(&bytes.Buffer{})
+			cmd.SetArgs([]string{
+				fmt.Sprintf("--duration=%d", tt.seconds),
+			})
+
+			got := cmd.Execute()
+
+			assert.Error(t, got, tt.expected.Error())
+		})
+	}
+}
