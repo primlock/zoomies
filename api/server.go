@@ -80,7 +80,8 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 	displayChannel := make(chan bool)
 
 	ticker := time.NewTicker(200 * time.Millisecond)
-	area, err := pterm.DefaultArea.Start()
+
+	spinner, err := pterm.DefaultSpinner.Start()
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +93,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 				return
 			case <-ticker.C:
 				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-				area.Update(pterm.Sprintf("Download: %.2f Mbps\n", mbps))
+				spinner.UpdateText(pterm.Sprintf("Download: %.2f Mbps", mbps))
 			}
 		}
 	}
@@ -110,8 +111,11 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
-			area.Stop()
 			displayChannel <- true
+
+			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
+			spinner.Success(pterm.Sprintf("%.2f Mbps", avg))
+
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-downloadChannel:
 			// Begin another download while not timed out
@@ -154,7 +158,8 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 	displayChannel := make(chan bool)
 
 	ticker := time.NewTicker(200 * time.Millisecond)
-	area, err := pterm.DefaultArea.Start()
+
+	spinner, err := pterm.DefaultSpinner.Start()
 	if err != nil {
 		return 0, err
 	}
@@ -166,7 +171,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 				return
 			case <-ticker.C:
 				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-				area.Update(pterm.Sprintf("Upload: %.2f Mbps\n", mbps))
+				spinner.UpdateText(pterm.Sprintf("Upload: %.2f Mbps", mbps))
 			}
 		}
 	}
@@ -184,8 +189,11 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
-			area.Stop()
 			displayChannel <- true
+
+			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
+			spinner.Success(pterm.Sprintf("%.2f Mbps", avg))
+
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-uploadChannel:
 			// Begin another upload while not timed out
