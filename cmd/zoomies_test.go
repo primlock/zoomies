@@ -163,3 +163,27 @@ func TestDurationOutOfBounds(t *testing.T) {
 		})
 	}
 }
+
+func TestPingCountOutOfBounds(t *testing.T) {
+	testCases := []struct {
+		name     string
+		count    int
+		expected error
+	}{
+		{name: "Below the lower boundary", count: -1, expected: ErrPingCountOutOfBounds},
+		{name: "Above the upper boundary", count: 7, expected: ErrPingCountOutOfBounds},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.SetOutput(&bytes.Buffer{})
+			cmd.SetArgs([]string{
+				fmt.Sprintf("--pcount=%d", tt.count),
+			})
+
+			got := cmd.Execute()
+
+			assert.Error(t, got, tt.expected.Error())
+		})
+	}
+}

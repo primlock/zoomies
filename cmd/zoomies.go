@@ -34,6 +34,7 @@ type Options struct {
 type TestConfig struct {
 	Timeout            int
 	Duration           int
+	PingCount          int
 	ConcurrentRequests int
 	ChunkSize          int64
 }
@@ -52,6 +53,7 @@ var opts = &Options{
 	Config: TestConfig{
 		Timeout:            30,
 		Duration:           15,       // The amount of time the download and upload test runs for in seconds
+		PingCount:          3,        // The number of pings sent to the server in the latency test
 		ConcurrentRequests: 3,        // The number of concurrent HTTP request being made to download and upload
 		ChunkSize:          26214400, // The size of the chunk to be downloaded and uploaded in bytes
 	},
@@ -61,7 +63,8 @@ var (
 	ErrURLCountOutOfBounds  = errors.New("count must be in the range 1-5 inclusive")
 	ErrUnknownAppToken      = errors.New("invalid token passed as a parameter")
 	ErrChunkSizeOutOfBounds = errors.New("chunk size must be in the range 1-26214400 inclusive")
-	ErrDurationOutOfBounds  = errors.New("chunk size must be in the range 1-26214400 inclusive")
+	ErrDurationOutOfBounds  = errors.New("duration must be in the range 3-30 inclusive")
+	ErrPingCountOutOfBounds = errors.New("ping must be in the range 1-5 inclusive")
 )
 
 const (
@@ -83,6 +86,10 @@ var cmd = &cobra.Command{
 
 		if opts.Config.Duration < 3 || opts.Config.Duration > 30 {
 			return ErrDurationOutOfBounds
+		}
+
+		if opts.Config.PingCount < 1 || opts.Config.PingCount > 5 {
+			return ErrPingCountOutOfBounds
 		}
 
 		// Gather the required server information
@@ -226,7 +233,7 @@ func runTestSuite(servers []api.Server) error {
 }
 
 func runLatencyTest(server api.Server) error {
-	err := server.Latency(3)
+	err := server.Latency(opts.Config.PingCount)
 	if err != nil {
 		return err
 	}
@@ -273,6 +280,7 @@ func init() {
 	// TestConfig flags
 	cmd.Flags().Int64VarP(&opts.Config.ChunkSize, "chunk", "n", opts.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
 	cmd.Flags().IntVarP(&opts.Config.Duration, "duration", "d", opts.Config.Duration, "the length of time each test should run for (3-30 seconds)")
+	cmd.Flags().IntVarP(&opts.Config.PingCount, "pcount", "p", opts.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
 }
 
 func Execute() {
