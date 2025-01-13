@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/primlock/zoomies/api"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -217,7 +218,7 @@ func runTestSuite(servers []api.Server) error {
 				return err
 			}
 		} else {
-			fmt.Println("Download test is disabled")
+			pterm.DefaultBasicText.Printf("%s Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 
 		if opts.RunUploadTest {
@@ -225,7 +226,7 @@ func runTestSuite(servers []api.Server) error {
 				return err
 			}
 		} else {
-			fmt.Println("Upload test is disabled")
+			pterm.DefaultBasicText.Printf("%s Upload test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 	}
 
