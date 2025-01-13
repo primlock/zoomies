@@ -35,6 +35,24 @@ type Server struct {
 	} `json:"location"`
 }
 
+var (
+	DownloadPrinter = pterm.PrefixPrinter{
+		MessageStyle: &pterm.Style{pterm.FgLightBlue},
+		Prefix: pterm.Prefix{
+			Style: &pterm.Style{pterm.FgBlack, pterm.BgLightBlue},
+			Text:  "DOWNLOAD",
+		},
+	}
+
+	UploadPrinter = pterm.PrefixPrinter{
+		MessageStyle: &pterm.Style{pterm.FgLightMagenta},
+		Prefix: pterm.Prefix{
+			Style: &pterm.Style{pterm.FgBlack, pterm.BgLightMagenta},
+			Text:  " UPLOAD ",
+		},
+	}
+)
+
 func (s *Server) Download(requests int, chunk int64, duration time.Duration) (float64, error) {
 	var total uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
@@ -81,7 +99,11 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 
 	ticker := time.NewTicker(200 * time.Millisecond)
 
-	spinner, err := pterm.DefaultSpinner.Start()
+	spinner := &pterm.DefaultSpinner
+	spinner = spinner.WithShowTimer(false)
+	spinner.InfoPrinter = &DownloadPrinter
+
+	spinner, err = spinner.Start()
 	if err != nil {
 		return 0, err
 	}
@@ -114,7 +136,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 			displayChannel <- true
 
 			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
-			spinner.Success(pterm.Sprintf("%.2f Mbps", avg))
+			spinner.Info(pterm.Sprintf("%.2f Mbps", avg))
 
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-downloadChannel:
@@ -159,7 +181,11 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 
 	ticker := time.NewTicker(200 * time.Millisecond)
 
-	spinner, err := pterm.DefaultSpinner.Start()
+	spinner := &pterm.DefaultSpinner
+	spinner = spinner.WithShowTimer(false)
+	spinner.InfoPrinter = &UploadPrinter
+
+	spinner, err := spinner.Start()
 	if err != nil {
 		return 0, err
 	}
@@ -192,7 +218,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 			displayChannel <- true
 
 			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
-			spinner.Success(pterm.Sprintf("%.2f Mbps", avg))
+			spinner.Info(pterm.Sprintf("%.2f Mbps", avg))
 
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-uploadChannel:
