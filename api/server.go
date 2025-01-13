@@ -109,6 +109,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 
 	spinner := &pterm.DefaultSpinner
 	spinner = spinner.WithShowTimer(false)
+	spinner.Style = &pterm.Style{pterm.FgLightBlue}
 	spinner.InfoPrinter = &DownloadPrinter
 
 	spinner, err = spinner.Start()
@@ -191,6 +192,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 
 	spinner := &pterm.DefaultSpinner
 	spinner = spinner.WithShowTimer(false)
+	spinner.Style = &pterm.Style{pterm.FgLightMagenta}
 	spinner.InfoPrinter = &UploadPrinter
 
 	spinner, err := spinner.Start()
@@ -244,6 +246,7 @@ func (s *Server) Latency(count int) error {
 
 	spinner := &pterm.DefaultSpinner
 	spinner = spinner.WithShowTimer(false)
+	spinner.Style = &pterm.Style{pterm.FgLightYellow}
 	spinner.InfoPrinter = &LatencyPrinter
 
 	spinner, err := spinner.Start()
