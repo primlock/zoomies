@@ -124,7 +124,11 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 				return
 			case <-ticker.C:
 				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-				spinner.UpdateText(pterm.Sprintf("Download: %.2f Mbps", mbps))
+				text := "Running the download test"
+				if mbps > 1 {
+					text = pterm.Sprintf("Running the download test (%.2f Mbps)", mbps)
+				}
+				spinner.UpdateText(pterm.Sprintf("%s", text))
 			}
 		}
 	}
@@ -207,7 +211,11 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 				return
 			case <-ticker.C:
 				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-				spinner.UpdateText(pterm.Sprintf("Upload: %.2f Mbps", mbps))
+				text := "Running the upload test"
+				if mbps > 1 {
+					text = pterm.Sprintf("Running the upload test (%.2f Mbps)", mbps)
+				}
+				spinner.UpdateText(pterm.Sprintf("%s", text))
 			}
 		}
 	}
@@ -263,16 +271,16 @@ func (s *Server) Latency(count int) error {
 			case <-ticker.C:
 				switch dots {
 				case 0:
-					spinner.UpdateText("Ping:      ")
+					spinner.UpdateText("Running the latency test      ")
 					dots++
 				case 1:
-					spinner.UpdateText("Ping: .    ")
+					spinner.UpdateText("Running the latency test .    ")
 					dots++
 				case 2:
-					spinner.UpdateText("Ping: . .  ")
+					spinner.UpdateText("Running the latency test . .  ")
 					dots++
 				case 3:
-					spinner.UpdateText("Ping: . . .")
+					spinner.UpdateText("Running the latency test . . .")
 					dots = 0
 				}
 			}
