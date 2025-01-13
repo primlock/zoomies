@@ -203,6 +203,8 @@ func runTestSuite(servers []api.Server) error {
 
 		fmt.Printf("Server: %s (%s, %s)\n", ip, s.Location.City, s.Location.Country)
 
+		runLatencyTest(s)
+
 		if opts.RunDownloadTest {
 			if err := runDownloadTest(s); err != nil {
 				return err
@@ -218,6 +220,15 @@ func runTestSuite(servers []api.Server) error {
 		} else {
 			fmt.Println("Upload test is disabled")
 		}
+	}
+
+	return nil
+}
+
+func runLatencyTest(server api.Server) error {
+	err := server.Latency(3)
+	if err != nil {
+		return err
 	}
 
 	return nil

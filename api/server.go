@@ -51,6 +51,14 @@ var (
 			Text:  " UPLOAD ",
 		},
 	}
+
+	LatencyPrinter = pterm.PrefixPrinter{
+		MessageStyle: &pterm.Style{pterm.FgLightYellow},
+		Prefix: pterm.Prefix{
+			Style: &pterm.Style{pterm.FgBlack, pterm.BgLightYellow},
+			Text:  "  PING  ",
+		},
+	}
 )
 
 func (s *Server) Download(requests int, chunk int64, duration time.Duration) (float64, error) {
@@ -226,6 +234,68 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 			go uploadData()
 		}
 	}
+}
+
+func (s *Server) Latency(count int) error {
+	// Create a channel for updating the display
+	displayChannel := make(chan bool)
+
+	ticker := time.NewTicker(400 * time.Millisecond)
+
+	spinner := &pterm.DefaultSpinner
+	spinner = spinner.WithShowTimer(false)
+	spinner.InfoPrinter = &LatencyPrinter
+
+	spinner, err := spinner.Start()
+	if err != nil {
+		return err
+	}
+
+	dots := 0
+	updateDisplay := func() {
+		for {
+			select {
+			case <-displayChannel:
+				return
+			case <-ticker.C:
+				switch dots {
+				case 0:
+					spinner.UpdateText("Ping:      ")
+					dots++
+				case 1:
+					spinner.UpdateText("Ping: .    ")
+					dots++
+				case 2:
+					spinner.UpdateText("Ping: . .  ")
+					dots++
+				case 3:
+					spinner.UpdateText("Ping: . . .")
+					dots = 0
+				}
+			}
+		}
+	}
+
+	go updateDisplay()
+
+	rtt, err := s.ICMPProbe(count)
+	if err != nil {
+		ticker.Stop()
+		displayChannel <- true
+		return err
+	}
+
+	ticker.Stop()
+	displayChannel <- true
+
+	t := rtt.Round(time.Millisecond)
+
+	// Update the console with the results of the test
+	spinner.Info(pterm.Sprintf("%s", t))
+
+	spinner.Stop()
+
+	return nil
 }
 
 func (s *Server) SetChunkSize(size int64) error {
