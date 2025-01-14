@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -36,28 +37,22 @@ type Server struct {
 }
 
 var (
-	DownloadPrinter = pterm.PrefixPrinter{
-		MessageStyle: &pterm.Style{pterm.FgLightBlue},
+	CompletedPrinter = pterm.PrefixPrinter{
 		Prefix: pterm.Prefix{
-			Style: &pterm.Style{pterm.FgBlack, pterm.BgLightBlue},
-			Text:  "DOWNLOAD",
+			Text: pterm.ThemeDefault.Checkmark.Checked,
 		},
 	}
 
-	UploadPrinter = pterm.PrefixPrinter{
-		MessageStyle: &pterm.Style{pterm.FgLightMagenta},
-		Prefix: pterm.Prefix{
-			Style: &pterm.Style{pterm.FgBlack, pterm.BgLightMagenta},
-			Text:  " UPLOAD ",
-		},
-	}
-
-	LatencyPrinter = pterm.PrefixPrinter{
-		MessageStyle: &pterm.Style{pterm.FgLightYellow},
-		Prefix: pterm.Prefix{
-			Style: &pterm.Style{pterm.FgBlack, pterm.BgLightYellow},
-			Text:  "  PING  ",
-		},
+	Spinner = pterm.SpinnerPrinter{
+		Sequence:            pterm.DefaultSpinner.Sequence,
+		Style:               &pterm.Style{pterm.FgGreen},
+		Delay:               pterm.DefaultSpinner.Delay,
+		ShowTimer:           false,
+		TimerRoundingFactor: time.Second,
+		TimerStyle:          &pterm.ThemeDefault.TimerStyle,
+		MessageStyle:        &pterm.ThemeDefault.SpinnerTextStyle,
+		InfoPrinter:         &CompletedPrinter,
+		Writer:              os.Stderr,
 	}
 )
 
@@ -107,12 +102,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 
 	ticker := time.NewTicker(200 * time.Millisecond)
 
-	spinner := &pterm.DefaultSpinner
-	spinner = spinner.WithShowTimer(false)
-	spinner.Style = &pterm.Style{pterm.FgLightBlue}
-	spinner.InfoPrinter = &DownloadPrinter
-
-	spinner, err = spinner.Start()
+	spinner, err := Spinner.Start()
 	if err != nil {
 		return 0, err
 	}
@@ -149,7 +139,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 			displayChannel <- true
 
 			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
-			spinner.Info(pterm.Sprintf("%.2f Mbps", avg))
+			spinner.Info(pterm.Sprintf("Download speed: %.2f Mbps", avg))
 
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-downloadChannel:
@@ -194,12 +184,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 
 	ticker := time.NewTicker(200 * time.Millisecond)
 
-	spinner := &pterm.DefaultSpinner
-	spinner = spinner.WithShowTimer(false)
-	spinner.Style = &pterm.Style{pterm.FgLightMagenta}
-	spinner.InfoPrinter = &UploadPrinter
-
-	spinner, err := spinner.Start()
+	spinner, err := Spinner.Start()
 	if err != nil {
 		return 0, err
 	}
@@ -236,7 +221,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 			displayChannel <- true
 
 			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
-			spinner.Info(pterm.Sprintf("%.2f Mbps", avg))
+			spinner.Info(pterm.Sprintf("Upload speed: %.2f Mbps", avg))
 
 			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
 		case <-uploadChannel:
@@ -252,12 +237,7 @@ func (s *Server) Latency(count int) error {
 
 	ticker := time.NewTicker(400 * time.Millisecond)
 
-	spinner := &pterm.DefaultSpinner
-	spinner = spinner.WithShowTimer(false)
-	spinner.Style = &pterm.Style{pterm.FgLightYellow}
-	spinner.InfoPrinter = &LatencyPrinter
-
-	spinner, err := spinner.Start()
+	spinner, err := Spinner.Start()
 	if err != nil {
 		return err
 	}
@@ -302,9 +282,7 @@ func (s *Server) Latency(count int) error {
 	t := rtt.Round(time.Millisecond)
 
 	// Update the console with the results of the test
-	spinner.Info(pterm.Sprintf("%s", t))
-
-	spinner.Stop()
+	spinner.Info(pterm.Sprintf("Ping: %s", t))
 
 	return nil
 }

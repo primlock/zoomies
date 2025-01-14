@@ -218,7 +218,7 @@ func runTestSuite(servers []api.Server) error {
 				return err
 			}
 		} else {
-			pterm.DefaultBasicText.Printf("%s Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
+			pterm.DefaultBasicText.Printf(" %s  Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 
 		if opts.RunUploadTest {
@@ -226,7 +226,7 @@ func runTestSuite(servers []api.Server) error {
 				return err
 			}
 		} else {
-			pterm.DefaultBasicText.Printf("%s Upload test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
+			pterm.DefaultBasicText.Printf(" %s  Upload test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 	}
 
