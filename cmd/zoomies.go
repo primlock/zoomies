@@ -16,6 +16,7 @@ import (
 )
 
 type RemoteServerResponse struct {
+	Client  api.Client   `json:"client"`
 	Targets []api.Server `json:"targets"`
 }
 
@@ -66,6 +67,7 @@ var (
 	ErrChunkSizeOutOfBounds = errors.New("chunk size must be in the range 1-26214400 inclusive")
 	ErrDurationOutOfBounds  = errors.New("duration must be in the range 3-30 inclusive")
 	ErrPingCountOutOfBounds = errors.New("ping must be in the range 1-5 inclusive")
+	ErrNoCandidatesToRank   = errors.New("the candidates object supplied was nil")
 )
 
 const (
@@ -94,13 +96,15 @@ var cmd = &cobra.Command{
 		}
 
 		// Gather the required server information
-		candidates, err := getRemoteServerList(opts.APIEndpointToken)
+		resp, err := getRemoteServerList(opts.APIEndpointToken)
 		if err != nil {
 			return err
 		}
 
+		pterm.DefaultBasicText.Printf("Testing from Origin: %s — %s, %s [%s]\n", resp.Client.ISP, resp.Client.Location.City, resp.Client.Location.Country, resp.Client.IP)
+
 		// Narrow down the list of server to the one with the lowest RTT.
-		servers, err := getLowestRTTServers(candidates, opts.TestServerCount, getProbeFunc(opts.ICMPTest))
+		servers, err := getLowestRTTServers(resp.Targets, opts.TestServerCount, getProbeFunc(opts.ICMPTest))
 		if err != nil {
 			return err
 		}
@@ -121,7 +125,7 @@ var cmd = &cobra.Command{
 }
 
 // Get a list of servers from a remote URL.
-func getRemoteServerList(token string) ([]api.Server, error) {
+func getRemoteServerList(token string) (*RemoteServerResponse, error) {
 	// Dynamically retrieve the endpoint token
 	if token == "" {
 		t, err := api.GetAPIEndpointToken()
@@ -155,7 +159,7 @@ func getRemoteServerList(token string) ([]api.Server, error) {
 		return nil, err
 	}
 
-	return remote.Targets, nil
+	return &remote, nil
 }
 
 // TODO: Get a list of servers from a local file: func getLocalServerList() ([]api.Server, error)
@@ -163,17 +167,20 @@ func getRemoteServerList(token string) ([]api.Server, error) {
 // Determine the testing servers by evaluating the lowest round-trip times (RTT). The number
 // of servers returned is limited by 'count' and the type of probe is determined by 'pf'.
 func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) ([]api.Server, error) {
-	if len(candidates) < count {
+	if len(candidates) == 0 {
+		return []api.Server{}, ErrNoCandidatesToRank
+	} else if len(candidates) < count {
 		count = len(candidates)
 	}
+
+	pterm.DefaultBasicText.Println("Searching for the fastest test server candidates")
 
 	// Get the RTT of each server and store it in our Candidate struct for sorting.
 	s := make([]Candidate, 0, len(candidates))
 	for i := 0; i < len(candidates); i++ {
 		rtt, err := pf(candidates[i], 1)
-
 		if err != nil {
-			return nil, err
+			return []api.Server{}, err
 		}
 
 		s = append(s, Candidate{Server: candidates[i], RTT: rtt})
@@ -202,14 +209,14 @@ func getProbeFunc(opt bool) api.ProbeFunc {
 }
 
 func runTestSuite(servers []api.Server) error {
-	for _, s := range servers {
+	for i, s := range servers {
 		// Display the server being tested
 		ip, err := s.GetIPv4()
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("Server: %s (%s, %s)\n", ip, s.Location.City, s.Location.Country)
+		pterm.DefaultBasicText.Printf("Testing Server: %s, %s [%s]\n", s.Location.City, s.Location.Country, ip)
 
 		runLatencyTest(s)
 
@@ -227,6 +234,10 @@ func runTestSuite(servers []api.Server) error {
 			}
 		} else {
 			pterm.DefaultBasicText.Printf(" %s  Upload test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
+		}
+
+		if i < len(servers)-1 {
+			pterm.DefaultBasicText.Printf("\n")
 		}
 	}
 

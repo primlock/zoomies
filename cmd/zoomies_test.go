@@ -97,9 +97,10 @@ func TestGetLowestRTTServers(t *testing.T) {
 		count      int
 		probeFunc  api.ProbeFunc
 		expected   []string
+		err        error
 	}{
 		{
-			name: "Top 2 Servers with the Lowest RTT",
+			name: "Top 2 servers with the lowest rtt",
 			candidates: []api.Server{
 				{Name: "server1"},
 				{Name: "server2"},
@@ -108,9 +109,10 @@ func TestGetLowestRTTServers(t *testing.T) {
 			count:     2,
 			probeFunc: mockProbeFunc,
 			expected:  []string{"server1", "server2"},
+			err:       nil,
 		},
 		{
-			name: "Request More Servers than Available",
+			name: "Request more servers than available",
 			candidates: []api.Server{
 				{Name: "server1"},
 				{Name: "server2"},
@@ -118,6 +120,15 @@ func TestGetLowestRTTServers(t *testing.T) {
 			count:     4,
 			probeFunc: mockProbeFunc,
 			expected:  []string{"server1", "server2"},
+			err:       nil,
+		},
+		{
+			name:       "Empty list of servers passed",
+			candidates: []api.Server{},
+			count:      4,
+			probeFunc:  mockProbeFunc,
+			expected:   []string{},
+			err:        ErrNoCandidatesToRank,
 		},
 	}
 
@@ -125,7 +136,7 @@ func TestGetLowestRTTServers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := getLowestRTTServers(tt.candidates, tt.count, tt.probeFunc)
 			if err != nil {
-				t.Errorf("got unexpected error: %v", err)
+				assert.Error(t, err, tt.err.Error())
 			}
 
 			names := make([]string, len(got))
