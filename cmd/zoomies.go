@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"time"
@@ -20,45 +19,45 @@ type RemoteServerResponse struct {
 	Targets []api.Server `json:"targets"`
 }
 
-type Options struct {
-	APIEndpointToken string
-	ICMPTest         bool
-	TestServerCount  int
-	RunDownloadTest  bool
-	RunUploadTest    bool
-	Config           TestConfig
-
-	// Json Server File
-	// list the servers being tested
-	// test with only the fastest server
-}
-
-type TestConfig struct {
-	Timeout            int
-	Duration           int
-	PingCount          int
-	ConcurrentRequests int
-	ChunkSize          int64
-}
-
 type Candidate struct {
 	Server api.Server
 	RTT    time.Duration
 }
 
-// Possibly move this into a local scope: RunE
-var opts = &Options{
-	TestServerCount: 1,
-	ICMPTest:        true,
-	RunDownloadTest: true,
-	RunUploadTest:   true,
-	Config: TestConfig{
-		Timeout:            30,
-		Duration:           15,       // The amount of time the download and upload test runs for in seconds
-		PingCount:          3,        // The number of pings sent to the server in the latency test
-		ConcurrentRequests: 3,        // The number of concurrent HTTP request being made to download and upload
-		ChunkSize:          26214400, // The size of the chunk to be downloaded and uploaded in bytes
-	},
+type Parameters struct {
+	// The endpoint used to gather testing server information.
+	APIEndpointToken string
+
+	// The option to perform an ICMP ping test or HTTP ping test.
+	ICMPTest bool
+
+	// The number of servers to run speed tests on.
+	TestServerCount int
+
+	// The option to skip the download speed test.
+	RunDownloadTest bool
+
+	// The option to skip the upload speed test.
+	RunUploadTest bool
+
+	// Configurations that apply to download, upload and latency tests.
+	Config *TestConfig
+}
+
+type TestConfig struct {
+	Timeout int
+
+	// The amount of time the download and upload test runs for in seconds
+	Duration int
+
+	// The number of pings sent to the server in the latency test
+	PingCount int
+
+	// The number of concurrent HTTP request being made to download and upload
+	ConcurrentRequests int
+
+	// The size of the chunk to be downloaded and uploaded in bytes
+	ChunkSize int64
 }
 
 var (
@@ -71,60 +70,114 @@ var (
 )
 
 const (
-	UploadTestPayloadSize = 25 * 1024 * 1024 // 25 MB
+	CommandName               = "zoomies"
+	CommandDescription        = "zoomies is a network speed measurement tool"
+	UploadTestPayloadSize     = 25 * 1024 * 1024 // 25 MB
+	DefaultTestServerCount    = 1
+	DefaultRunDownloadTest    = true
+	DefaultRunUploadTest      = true
+	DefaultTimeout            = 30
+	DefaultDuration           = 15
+	DefaultPingCount          = 3
+	DefaultConcurrentRequests = 3
+	DefaultChunkSize          = 26214400
 )
 
-var cmd = &cobra.Command{
-	Use:   "zoomies",
-	Short: "zoomies is a network speed measurement tool",
-	RunE: func(cmd *cobra.Command, args []string) error {
+func NewTestConfig() *TestConfig {
+	return &TestConfig{
+		Timeout:            DefaultTimeout,
+		Duration:           DefaultDuration,
+		PingCount:          DefaultPingCount,
+		ConcurrentRequests: DefaultConcurrentRequests,
+		ChunkSize:          DefaultChunkSize,
+	}
+}
 
-		if opts.TestServerCount < 1 || opts.TestServerCount > 5 {
-			return ErrURLCountOutOfBounds
+func NewParameters() *Parameters {
+	return &Parameters{
+		TestServerCount: DefaultTestServerCount,
+		RunDownloadTest: DefaultRunDownloadTest,
+		RunUploadTest:   DefaultRunUploadTest,
+		Config:          NewTestConfig(),
+	}
+}
+
+func NewCmd() *cobra.Command {
+	params := NewParameters()
+
+	cmd := &cobra.Command{
+		Use:   CommandName,
+		Short: CommandDescription,
+	}
+
+	// Define the user provided params.
+	cmd.Flags().StringVarP(&params.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
+	cmd.Flags().IntVarP(&params.TestServerCount, "count", "c", params.TestServerCount, "number of servers to perform testing on")
+	cmd.Flags().BoolVar(&params.RunDownloadTest, "download", params.RunDownloadTest, "perform the download test")
+	cmd.Flags().BoolVar(&params.RunUploadTest, "upload", params.RunUploadTest, "perform the upload test")
+	cmd.Flags().BoolVar(&params.ICMPTest, "icmp", params.ICMPTest, "use icmp to determine RTT, use HTTP if false")
+
+	cmd.Flags().Int64VarP(&params.Config.ChunkSize, "chunk", "n", params.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
+	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time each test should run for (3-30 seconds)")
+	cmd.Flags().IntVarP(&params.Config.PingCount, "pcount", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
+
+	// Set the function to execute the logic.
+	cmd.RunE = cmdRunE(params)
+
+	return cmd
+}
+
+// cmdRunE executes the logic of the command line application.
+func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		err := cmdValidateE(params)
+		if err != nil {
+			return err
 		}
 
-		if opts.Config.ChunkSize < 1 || opts.Config.ChunkSize > 26214400 {
-			return ErrChunkSizeOutOfBounds
-		}
-
-		if opts.Config.Duration < 3 || opts.Config.Duration > 30 {
-			return ErrDurationOutOfBounds
-		}
-
-		if opts.Config.PingCount < 1 || opts.Config.PingCount > 5 {
-			return ErrPingCountOutOfBounds
-		}
-
-		// Gather the required server information
-		resp, err := getRemoteServerList(opts.APIEndpointToken)
+		resp, err := getRemoteServerList(params.APIEndpointToken)
 		if err != nil {
 			return err
 		}
 
 		pterm.DefaultBasicText.Printf("Testing from Origin: %s — %s, %s [%s]\n", resp.Client.ISP, resp.Client.Location.City, resp.Client.Location.Country, resp.Client.IP)
 
-		// Narrow down the list of server to the one with the lowest RTT.
-		servers, err := getLowestRTTServers(resp.Targets, opts.TestServerCount, getProbeFunc(opts.ICMPTest))
+		servers, err := getLowestRTTServers(resp.Targets, params.TestServerCount, getProbeFunc(params.ICMPTest))
 		if err != nil {
 			return err
 		}
 
-		// Keep for debug
-		// cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		// 	fmt.Printf("Flag '%s': %s\n", flag.Name, flag.Value)
-		// })
-
-		// Run the tests
-		err = runTestSuite(servers)
+		err = runTestSuite(params, servers)
 		if err != nil {
 			return err
 		}
 
 		return nil
-	},
+	}
 }
 
-// Get a list of servers from a remote URL.
+// cmdValidateE validates the parameters the users passes on the command line.
+func cmdValidateE(params *Parameters) error {
+	if params.TestServerCount < 1 || params.TestServerCount > 5 {
+		return ErrURLCountOutOfBounds
+	}
+
+	if params.Config.ChunkSize < 1 || params.Config.ChunkSize > 26214400 {
+		return ErrChunkSizeOutOfBounds
+	}
+
+	if params.Config.Duration < 3 || params.Config.Duration > 30 {
+		return ErrDurationOutOfBounds
+	}
+
+	if params.Config.PingCount < 1 || params.Config.PingCount > 5 {
+		return ErrPingCountOutOfBounds
+	}
+
+	return nil
+}
+
+// getRemoteServerList gets a list of servers from a remote URL.
 func getRemoteServerList(token string) (*RemoteServerResponse, error) {
 	// Dynamically retrieve the endpoint token
 	if token == "" {
@@ -152,7 +205,7 @@ func getRemoteServerList(token string) (*RemoteServerResponse, error) {
 		return nil, err
 	}
 
-	// Convert the remote response into a JSON object
+	// Convert the remote response into a JSON object.
 	var remote RemoteServerResponse
 	err = json.Unmarshal(body, &remote)
 	if err != nil {
@@ -162,10 +215,8 @@ func getRemoteServerList(token string) (*RemoteServerResponse, error) {
 	return &remote, nil
 }
 
-// TODO: Get a list of servers from a local file: func getLocalServerList() ([]api.Server, error)
-
-// Determine the testing servers by evaluating the lowest round-trip times (RTT). The number
-// of servers returned is limited by 'count' and the type of probe is determined by 'pf'.
+// getLowestRTTServers determines the testing servers by evaluating the lowest round-trip times (RTT).
+// The number of servers returned is limited by 'count' and the type of probe is determined by 'pf'.
 func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) ([]api.Server, error) {
 	if len(candidates) == 0 {
 		return []api.Server{}, ErrNoCandidatesToRank
@@ -186,7 +237,7 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 		s = append(s, Candidate{Server: candidates[i], RTT: rtt})
 	}
 
-	// Sort by RTT (ascending)
+	// Sort by RTT (ascending).
 	sort.Slice(s, func(i, j int) bool {
 		return s[i].RTT < s[j].RTT
 	})
@@ -208,9 +259,8 @@ func getProbeFunc(opt bool) api.ProbeFunc {
 	return api.ICMPProbe
 }
 
-func runTestSuite(servers []api.Server) error {
+func runTestSuite(params *Parameters, servers []api.Server) error {
 	for i, s := range servers {
-		// Display the server being tested
 		ip, err := s.GetIPv4()
 		if err != nil {
 			return err
@@ -218,18 +268,18 @@ func runTestSuite(servers []api.Server) error {
 
 		pterm.DefaultBasicText.Printf("Testing Server: %s, %s [%s]\n", s.Location.City, s.Location.Country, ip)
 
-		runLatencyTest(s)
+		runLatencyTest(s, params.Config.PingCount)
 
-		if opts.RunDownloadTest {
-			if err := runDownloadTest(s); err != nil {
+		if params.RunDownloadTest {
+			if err := runDownloadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.ChunkSize); err != nil {
 				return err
 			}
 		} else {
 			pterm.DefaultBasicText.Printf(" %s  Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 
-		if opts.RunUploadTest {
-			if err := runUploadTest(s); err != nil {
+		if params.RunUploadTest {
+			if err := runUploadTest(s, params.Config.ConcurrentRequests, params.Config.Duration); err != nil {
 				return err
 			}
 		} else {
@@ -244,8 +294,9 @@ func runTestSuite(servers []api.Server) error {
 	return nil
 }
 
-func runLatencyTest(server api.Server) error {
-	err := server.Latency(opts.Config.PingCount)
+// runLatencyTest performs the latency test that measures server ping.
+func runLatencyTest(server api.Server, pings int) error {
+	err := server.Latency(pings)
 	if err != nil {
 		return err
 	}
@@ -253,13 +304,14 @@ func runLatencyTest(server api.Server) error {
 	return nil
 }
 
-func runDownloadTest(server api.Server) error {
-	err := server.SetChunkSize(opts.Config.ChunkSize)
+// runDownloadTest performs the download speed test that measures the download rate in Mbps.
+func runDownloadTest(server api.Server, requests, duration int, chunk int64) error {
+	err := server.SetChunkSize(chunk)
 	if err != nil {
 		return fmt.Errorf("failed to append chunk size: %s", err)
 	}
 
-	_, err = server.Download(opts.Config.ConcurrentRequests, opts.Config.ChunkSize, time.Duration(opts.Config.Duration)*time.Second)
+	_, err = server.Download(requests, chunk, time.Duration(duration)*time.Second)
 	if err != nil {
 		return err
 	}
@@ -267,36 +319,18 @@ func runDownloadTest(server api.Server) error {
 	return nil
 }
 
-func runUploadTest(server api.Server) error {
+// runDownloadTest performs the upload speed test that generates a payload to send to the server
+// and measures it's upload rate in Mbps.
+func runUploadTest(server api.Server, requests, duration int) error {
 	payload, err := api.GeneratePayload(UploadTestPayloadSize)
 	if err != nil {
 		return err
 	}
 
-	_, err = server.Upload(opts.Config.ConcurrentRequests, time.Duration(opts.Config.Duration)*time.Second, payload)
+	_, err = server.Upload(requests, time.Duration(duration)*time.Second, payload)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func init() {
-	// Options Flags
-	cmd.Flags().StringVarP(&opts.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
-	cmd.Flags().IntVarP(&opts.TestServerCount, "count", "c", opts.TestServerCount, "number of servers to perform testing on")
-	cmd.Flags().BoolVar(&opts.RunDownloadTest, "download", opts.RunDownloadTest, "perform the download test")
-	cmd.Flags().BoolVar(&opts.RunUploadTest, "upload", opts.RunUploadTest, "perform the upload test")
-	cmd.Flags().BoolVar(&opts.ICMPTest, "icmp", opts.ICMPTest, "use icmp to determine RTT, use HTTP if false")
-
-	// TestConfig flags
-	cmd.Flags().Int64VarP(&opts.Config.ChunkSize, "chunk", "n", opts.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
-	cmd.Flags().IntVarP(&opts.Config.Duration, "duration", "d", opts.Config.Duration, "the length of time each test should run for (3-30 seconds)")
-	cmd.Flags().IntVarP(&opts.Config.PingCount, "pcount", "p", opts.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
-}
-
-func Execute() {
-	if err := cmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
 }

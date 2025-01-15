@@ -23,12 +23,14 @@ func TestURLCountOutOfBounds(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd.SetOutput(&bytes.Buffer{})
-			cmd.SetArgs([]string{
+			c := NewCmd()
+
+			c.SetOutput(&bytes.Buffer{})
+			c.SetArgs([]string{
 				fmt.Sprintf("--count=%d", tt.count),
 			})
 
-			got := cmd.Execute()
+			got := c.Execute()
 
 			assert.Error(t, got, tt.expected.Error())
 		})
@@ -46,13 +48,14 @@ func TestBadToken(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd.SetOutput(&bytes.Buffer{})
-			cmd.SetArgs([]string{
-				fmt.Sprintf("--count=%d", 1),
+			c := NewCmd()
+
+			c.SetOutput(&bytes.Buffer{})
+			c.SetArgs([]string{
 				fmt.Sprintf("--token=%s", tt.token),
 			})
 
-			got := cmd.Execute()
+			got := c.Execute()
 
 			assert.Error(t, got, tt.expected.Error())
 		})
@@ -71,12 +74,14 @@ func TestChunkSizeOutOfBounds(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd.SetOutput(&bytes.Buffer{})
-			cmd.SetArgs([]string{
+			c := NewCmd()
+
+			c.SetOutput(&bytes.Buffer{})
+			c.SetArgs([]string{
 				fmt.Sprintf("--chunk=%d", tt.n),
 			})
 
-			got := cmd.Execute()
+			got := c.Execute()
 
 			assert.Error(t, got, tt.expected.Error())
 		})
@@ -163,12 +168,14 @@ func TestDurationOutOfBounds(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd.SetOutput(&bytes.Buffer{})
-			cmd.SetArgs([]string{
+			c := NewCmd()
+
+			c.SetOutput(&bytes.Buffer{})
+			c.SetArgs([]string{
 				fmt.Sprintf("--duration=%d", tt.seconds),
 			})
 
-			got := cmd.Execute()
+			got := c.Execute()
 
 			assert.Error(t, got, tt.expected.Error())
 		})
@@ -187,12 +194,14 @@ func TestPingCountOutOfBounds(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd.SetOutput(&bytes.Buffer{})
-			cmd.SetArgs([]string{
+			c := NewCmd()
+
+			c.SetOutput(&bytes.Buffer{})
+			c.SetArgs([]string{
 				fmt.Sprintf("--pcount=%d", tt.count),
 			})
 
-			got := cmd.Execute()
+			got := c.Execute()
 
 			assert.Error(t, got, tt.expected.Error())
 		})
