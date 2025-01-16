@@ -98,8 +98,8 @@ func extractToken(response string) (string, error) {
 }
 
 // BytesConsumed provides a human readable string that describes how much data was read or written.
-func BytesConsumed(bytes uint64, binary bool) string {
-	var val float64 = float64(bytes)
+func BytesConsumed(B uint64, binary bool) string {
+	var val float64 = float64(B)
 	var base float64 = 1000
 	units := []string{"B", "KB", "MB", "GB"}
 
@@ -118,8 +118,8 @@ func BytesConsumed(bytes uint64, binary bool) string {
 }
 
 // CurrentBitRate provides a human readable string that describes the rate of the data transfer.
-func CurrentBitRate(bytes uint64, start time.Time, binary bool) string {
-	bps := float64(bytes*8) / time.Since(start).Seconds()
+func CurrentBitRate(B uint64, start time.Time, binary bool) string {
+	bps := float64(B*8) / time.Since(start).Seconds()
 	var base float64 = 1000
 	units := []string{"bps", "Kbps", "Mbps", "Gbps"}
 

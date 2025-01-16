@@ -57,7 +57,7 @@ var (
 )
 
 func (s *Server) Download(requests int, chunk int64, duration time.Duration, useBinaryUnitPrefix bool) (float64, error) {
-	var total uint64
+	var totalB uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
@@ -90,7 +90,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 				}
 			}
 
-			atomic.AddUint64(&total, uint64(n))
+			atomic.AddUint64(&totalB, uint64(n))
 
 			// Signal the channel that the download finished
 			downloadChannel <- struct{}{}
@@ -113,7 +113,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 			case <-displayChannel:
 				return
 			case <-ticker.C:
-				speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
+				speed := CurrentBitRate(totalB, start, useBinaryUnitPrefix)
 				spinner.UpdateText(pterm.Sprintf("Running the download test (%s)", speed))
 			}
 		}
@@ -134,8 +134,8 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 			ticker.Stop()
 			displayChannel <- true
 
-			speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
-			consumed := BytesConsumed(total, useBinaryUnitPrefix)
+			speed := CurrentBitRate(totalB, start, useBinaryUnitPrefix)
+			consumed := BytesConsumed(totalB, useBinaryUnitPrefix)
 			spinner.Info(pterm.Sprintf("Download speed: %s (%s)", speed, consumed))
 
 			return 0, nil
@@ -147,7 +147,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 }
 
 func (s *Server) Upload(requests int, duration time.Duration, payload []byte, useBinaryUnitPrefix bool) (float64, error) {
-	var total uint64
+	var totalB uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
@@ -169,7 +169,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 		} else {
 			defer resp.Body.Close()
 
-			atomic.AddUint64(&total, uint64(len(payload)))
+			atomic.AddUint64(&totalB, uint64(len(payload)))
 
 			// Signal the channel that the upload finished
 			uploadChannel <- struct{}{}
@@ -192,7 +192,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 			case <-displayChannel:
 				return
 			case <-ticker.C:
-				speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
+				speed := CurrentBitRate(totalB, start, useBinaryUnitPrefix)
 				spinner.UpdateText(pterm.Sprintf("Running the upload test (%s)", speed))
 			}
 		}
@@ -213,8 +213,8 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 			ticker.Stop()
 			displayChannel <- true
 
-			speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
-			consumed := BytesConsumed(total, useBinaryUnitPrefix)
+			speed := CurrentBitRate(totalB, start, useBinaryUnitPrefix)
+			consumed := BytesConsumed(totalB, useBinaryUnitPrefix)
 			spinner.Info(pterm.Sprintf("Upload speed: %s (%s)", speed, consumed))
 
 			return 0, nil
