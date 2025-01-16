@@ -58,6 +58,9 @@ type TestConfig struct {
 
 	// The size of the chunk to be downloaded and uploaded in bytes
 	ChunkSize int64
+
+	// Determines whether the unit prefixes are displayed as decimal (Mbps) or binary (Mibit/s)
+	BinaryUnitPrefix bool
 }
 
 var (
@@ -81,6 +84,7 @@ const (
 	DefaultPingCount          = 3
 	DefaultConcurrentRequests = 3
 	DefaultChunkSize          = 26214400
+	DefaultBinaryUnitPrefix   = false
 )
 
 func NewTestConfig() *TestConfig {
@@ -90,6 +94,7 @@ func NewTestConfig() *TestConfig {
 		PingCount:          DefaultPingCount,
 		ConcurrentRequests: DefaultConcurrentRequests,
 		ChunkSize:          DefaultChunkSize,
+		BinaryUnitPrefix:   DefaultBinaryUnitPrefix,
 	}
 }
 
@@ -120,6 +125,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&params.Config.ChunkSize, "chunk", "n", params.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
 	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time each test should run for (3-30 seconds)")
 	cmd.Flags().IntVarP(&params.Config.PingCount, "pcount", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
+	cmd.Flags().BoolVarP(&params.Config.BinaryUnitPrefix, "binary", "b", params.Config.BinaryUnitPrefix, "display the unit prefixes in binary (Mibit/s) instead of decimal (Mbps)")
 
 	// Set the function to execute the logic.
 	cmd.RunE = cmdRunE(params)
@@ -271,7 +277,7 @@ func runTestSuite(params *Parameters, servers []api.Server) error {
 		runLatencyTest(s, params.Config.PingCount)
 
 		if params.RunDownloadTest {
-			if err := runDownloadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.ChunkSize); err != nil {
+			if err := runDownloadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.ChunkSize, params.Config.BinaryUnitPrefix); err != nil {
 				return err
 			}
 		} else {
@@ -279,7 +285,7 @@ func runTestSuite(params *Parameters, servers []api.Server) error {
 		}
 
 		if params.RunUploadTest {
-			if err := runUploadTest(s, params.Config.ConcurrentRequests, params.Config.Duration); err != nil {
+			if err := runUploadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.BinaryUnitPrefix); err != nil {
 				return err
 			}
 		} else {
@@ -305,13 +311,13 @@ func runLatencyTest(server api.Server, pings int) error {
 }
 
 // runDownloadTest performs the download speed test that measures the download rate in Mbps.
-func runDownloadTest(server api.Server, requests, duration int, chunk int64) error {
+func runDownloadTest(server api.Server, requests, duration int, chunk int64, binary bool) error {
 	err := server.SetChunkSize(chunk)
 	if err != nil {
 		return fmt.Errorf("failed to append chunk size: %s", err)
 	}
 
-	_, err = server.Download(requests, chunk, time.Duration(duration)*time.Second)
+	_, err = server.Download(requests, chunk, time.Duration(duration)*time.Second, binary)
 	if err != nil {
 		return err
 	}
@@ -321,13 +327,13 @@ func runDownloadTest(server api.Server, requests, duration int, chunk int64) err
 
 // runDownloadTest performs the upload speed test that generates a payload to send to the server
 // and measures it's upload rate in Mbps.
-func runUploadTest(server api.Server, requests, duration int) error {
+func runUploadTest(server api.Server, requests, duration int, binary bool) error {
 	payload, err := api.GeneratePayload(UploadTestPayloadSize)
 	if err != nil {
 		return err
 	}
 
-	_, err = server.Upload(requests, time.Duration(duration)*time.Second, payload)
+	_, err = server.Upload(requests, time.Duration(duration)*time.Second, payload, binary)
 	if err != nil {
 		return err
 	}

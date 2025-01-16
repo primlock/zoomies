@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"regexp"
+	"time"
 
 	"golang.org/x/net/html"
 )
@@ -97,31 +97,42 @@ func extractToken(response string) (string, error) {
 	return match[1], nil
 }
 
-func CalculateMbps(contentLength, duration float64) float64 {
-	return (contentLength * 8) / (duration * 1_000_000)
-}
+// BytesConsumed provides a human readable string that describes how much data was read or written.
+func BytesConsumed(bytes uint64, binary bool) string {
+	var val float64 = float64(bytes)
+	var base float64 = 1000
+	units := []string{"B", "KB", "MB", "GB"}
 
-func CalculateAverage(speeds []float64) float64 {
-	sum := 0.0
-	for _, speed := range speeds {
-		sum += speed
+	if binary {
+		base = 1024
+		units = []string{"B", "KiB", "MiB", "GiB"}
 	}
-	return sum / float64(len(speeds))
-}
 
-func CalculateStdDev(speeds []float64, mean float64) float64 {
-	varianceSum := 0.0
-	for _, speed := range speeds {
-		varianceSum += math.Pow(speed-mean, 2)
+	var i int
+	for val >= base && i < len(units)-1 {
+		val /= base
+		i++
 	}
-	variance := varianceSum / float64(len(speeds))
-	return math.Sqrt(variance)
+
+	return fmt.Sprintf("%.2f %s", val, units[i])
 }
 
-func DisplayTestResults(speeds []float64) {
-	avg := CalculateAverage(speeds)
-	stdDev := CalculateStdDev(speeds, avg)
+// CurrentBitRate provides a human readable string that describes the rate of the data transfer.
+func CurrentBitRate(bytes uint64, start time.Time, binary bool) string {
+	bps := float64(bytes*8) / time.Since(start).Seconds()
+	var base float64 = 1000
+	units := []string{"bps", "Kbps", "Mbps", "Gbps"}
 
-	fmt.Printf("\nAverage Speed: %.2f Mbps - %v\n", avg, speeds)
-	fmt.Printf("Standard Deviation: %.2f Mbps\n\n", stdDev)
+	if binary {
+		base = 1024
+		units = []string{"bit/s", "Kibit/s", "Mibit/s", "Gibit/s"}
+	}
+
+	var i int
+	for bps >= base && i < len(units)-1 {
+		bps /= base
+		i++
+	}
+
+	return fmt.Sprintf("%.2f %s", bps, units[i])
 }

@@ -56,7 +56,7 @@ var (
 	}
 )
 
-func (s *Server) Download(requests int, chunk int64, duration time.Duration) (float64, error) {
+func (s *Server) Download(requests int, chunk int64, duration time.Duration, useBinaryUnitPrefix bool) (float64, error) {
 	var total uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
@@ -113,12 +113,8 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 			case <-displayChannel:
 				return
 			case <-ticker.C:
-				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-				text := "Running the download test"
-				if mbps > 1 {
-					text = pterm.Sprintf("Running the download test (%.2f Mbps)", mbps)
-				}
-				spinner.UpdateText(pterm.Sprintf("%s", text))
+				speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
+				spinner.UpdateText(pterm.Sprintf("Running the download test (%s)", speed))
 			}
 		}
 	}
@@ -138,10 +134,11 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 			ticker.Stop()
 			displayChannel <- true
 
-			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
-			spinner.Info(pterm.Sprintf("Download speed: %.2f Mbps", avg))
+			speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
+			consumed := BytesConsumed(total, useBinaryUnitPrefix)
+			spinner.Info(pterm.Sprintf("Download speed: %s (%s)", speed, consumed))
 
-			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
+			return 0, nil
 		case <-downloadChannel:
 			// Begin another download while not timed out
 			go downloadData()
@@ -149,7 +146,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration) (fl
 	}
 }
 
-func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (float64, error) {
+func (s *Server) Upload(requests int, duration time.Duration, payload []byte, useBinaryUnitPrefix bool) (float64, error) {
 	var total uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
@@ -195,12 +192,8 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 			case <-displayChannel:
 				return
 			case <-ticker.C:
-				mbps := CalculateMbps(float64(total), time.Since(start).Seconds())
-				text := "Running the upload test"
-				if mbps > 1 {
-					text = pterm.Sprintf("Running the upload test (%.2f Mbps)", mbps)
-				}
-				spinner.UpdateText(pterm.Sprintf("%s", text))
+				speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
+				spinner.UpdateText(pterm.Sprintf("Running the upload test (%s)", speed))
 			}
 		}
 	}
@@ -220,10 +213,11 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte) (f
 			ticker.Stop()
 			displayChannel <- true
 
-			avg := CalculateMbps(float64(total), time.Since(start).Seconds()) // TODO: calculate the average
-			spinner.Info(pterm.Sprintf("Upload speed: %.2f Mbps", avg))
+			speed := CurrentBitRate(total, start, useBinaryUnitPrefix)
+			consumed := BytesConsumed(total, useBinaryUnitPrefix)
+			spinner.Info(pterm.Sprintf("Upload speed: %s (%s)", speed, consumed))
 
-			return CalculateMbps(float64(total), time.Since(start).Seconds()), nil
+			return 0, nil
 		case <-uploadChannel:
 			// Begin another upload while not timed out
 			go uploadData()
