@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/primlock/zoomies/api"
+	"github.com/primlock/zoomies/internal/logger"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -42,6 +43,9 @@ type Parameters struct {
 
 	// Configurations that apply to download, upload and latency tests.
 	Config *TestConfig
+
+	// Provide additional information to the user from the logger
+	Verbose bool
 }
 
 type TestConfig struct {
@@ -71,6 +75,8 @@ var (
 	ErrPingCountOutOfBounds = errors.New("ping must be in the range 1-5 inclusive")
 	ErrNoCandidatesToRank   = errors.New("the candidates object supplied was nil")
 )
+
+var log = logger.TLog
 
 const (
 	CommandName               = "zoomies"
@@ -104,6 +110,7 @@ func NewParameters() *Parameters {
 		RunDownloadTest: DefaultRunDownloadTest,
 		RunUploadTest:   DefaultRunUploadTest,
 		Config:          NewTestConfig(),
+		Verbose:         false,
 	}
 }
 
@@ -111,8 +118,9 @@ func NewCmd() *cobra.Command {
 	params := NewParameters()
 
 	cmd := &cobra.Command{
-		Use:   CommandName,
-		Short: CommandDescription,
+		Use:          CommandName,
+		Short:        CommandDescription,
+		SilenceUsage: true,
 	}
 
 	// Define the user provided params.
@@ -126,6 +134,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time each test should run for (3-30 seconds)")
 	cmd.Flags().IntVarP(&params.Config.PingCount, "pcount", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
 	cmd.Flags().BoolVarP(&params.Config.BinaryUnitPrefix, "binary", "b", params.Config.BinaryUnitPrefix, "display the unit prefixes in binary (Mibit/s) instead of decimal (Mbps)")
+	cmd.Flags().BoolVar(&params.Verbose, "verbose", params.Verbose, "provide additional information from the logger")
 
 	// Set the function to execute the logic.
 	cmd.RunE = cmdRunE(params)
@@ -140,6 +149,20 @@ func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+
+		if params.Verbose {
+			log.Verbose()
+		}
+
+		log.Info(
+			"token: %s, download: %v, upload: %v, duration: %d, binary: %v, verbose: %v\n",
+			params.APIEndpointToken,
+			params.RunDownloadTest,
+			params.RunUploadTest,
+			params.Config.Duration,
+			params.Config.BinaryUnitPrefix,
+			params.Verbose,
+		)
 
 		resp, err := getRemoteServerList(params.APIEndpointToken)
 		if err != nil {
@@ -187,6 +210,7 @@ func cmdValidateE(params *Parameters) error {
 func getRemoteServerList(token string) (*RemoteServerResponse, error) {
 	// Dynamically retrieve the endpoint token
 	if token == "" {
+		log.Warn("no token found in provided params; getting api endpoint token\n")
 		t, err := api.GetAPIEndpointToken()
 		if err != nil {
 			return nil, err
@@ -203,6 +227,7 @@ func getRemoteServerList(token string) (*RemoteServerResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
+		log.Error("GET request made to %s?token=%s&https=true returned status code %d\n", api.FastSpeedTestServerURL, token, resp.StatusCode)
 		return nil, ErrUnknownAppToken
 	}
 
@@ -227,10 +252,9 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 	if len(candidates) == 0 {
 		return []api.Server{}, ErrNoCandidatesToRank
 	} else if len(candidates) < count {
+		log.Warn("number of candidates was less than the count parameter\n")
 		count = len(candidates)
 	}
-
-	pterm.DefaultBasicText.Println("Searching for the fastest test server candidates")
 
 	// Get the RTT of each server and store it in our Candidate struct for sorting.
 	s := make([]Candidate, 0, len(candidates))
@@ -241,6 +265,7 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 		}
 
 		s = append(s, Candidate{Server: candidates[i], RTT: rtt})
+		log.Info("server in %s, %s reported a ping of %s\n", candidates[i].Location.City, candidates[i].Location.Country, (rtt.Round(time.Millisecond)))
 	}
 
 	// Sort by RTT (ascending).

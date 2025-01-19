@@ -3,11 +3,9 @@ package api
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/primlock/zoomies/internal/logger"
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/pterm/pterm"
 )
@@ -56,6 +55,8 @@ var (
 	}
 )
 
+var log = logger.TLog
+
 func (s *Server) Download(requests int, chunk int64, duration time.Duration, useBinaryUnitPrefix bool) (float64, error) {
 	var totalB uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
@@ -67,6 +68,8 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 		return 0, fmt.Errorf("failed to generate http request: %s", err)
 	}
 
+	var logs []string
+
 	// Create a channel for tracking downloads
 	downloadChannel := make(chan struct{}, requests)
 
@@ -77,7 +80,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 		resp, err := http.DefaultClient.Do(clone)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				fmt.Printf("failed when making http request: %s", err)
+				logs = append(logs, fmt.Sprintf("failed when making http request: %s", err))
 			}
 		} else {
 			defer resp.Body.Close()
@@ -86,7 +89,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 			n, err := io.Copy(io.Discard, resp.Body)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-					fmt.Printf("failed to copy bytes: %s", err)
+					logs = append(logs, fmt.Sprintf("failed to copy bytes: %s", err))
 				}
 			}
 
@@ -138,6 +141,11 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 			consumed := BytesConsumed(totalB, useBinaryUnitPrefix)
 			spinner.Info(pterm.Sprintf("Download speed: %s (%s)", speed, consumed))
 
+			// Report the logs collected while running
+			for _, l := range logs {
+				log.Error("%s\n", l)
+			}
+
 			return 0, nil
 		case <-downloadChannel:
 			// Begin another download while not timed out
@@ -151,6 +159,8 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
+	var logs []string
+
 	// Create a channel for tracking uploads
 	uploadChannel := make(chan struct{}, requests)
 
@@ -158,13 +168,13 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 		// Generate a request for the URL
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.URL, bytes.NewReader(payload))
 		if err != nil {
-			fmt.Printf("failed to generate http request: %s", err)
+			logs = append(logs, fmt.Sprintf("failed to generate http request: %s", err))
 		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				fmt.Printf("failed when making http request: %s", err)
+				logs = append(logs, fmt.Sprintf("failed when making http request: %s", err))
 			}
 		} else {
 			defer resp.Body.Close()
@@ -216,6 +226,11 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 			speed := CurrentBitRate(totalB, start, useBinaryUnitPrefix)
 			consumed := BytesConsumed(totalB, useBinaryUnitPrefix)
 			spinner.Info(pterm.Sprintf("Upload speed: %s (%s)", speed, consumed))
+
+			// Report the logs collected while running
+			for _, l := range logs {
+				log.Error("%s\n", l)
+			}
 
 			return 0, nil
 		case <-uploadChannel:
@@ -376,30 +391,4 @@ func ICMPProbe(server Server, count int) (time.Duration, error) {
 
 func HTTPProbe(server Server, count int) (time.Duration, error) {
 	return server.HTTPProbe(count)
-}
-
-// Pretty print the JSON object representing the server list.
-func DisplayAllServers(servers []Server) error {
-	// Create a custom JSON encoder to disable HTML escaping
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetEscapeHTML(false)
-
-	// Encode the object with the custom encoder
-	err := encoder.Encode(servers)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Pretty-print the JSON contents
-	var pretty bytes.Buffer
-	err = json.Indent(&pretty, buf.Bytes(), "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Print the pretty JSON
-	fmt.Println(pretty.String())
-
-	return nil
 }
