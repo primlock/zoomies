@@ -5,7 +5,7 @@ go 1.23.3
 require (
 	github.com/prometheus-community/pro-bing v0.5.0
 	github.com/pterm/pterm v0.12.80
-	golang.org/x/net v0.32.0
+	golang.org/x/net v0.33.0
 )
 
 require (
