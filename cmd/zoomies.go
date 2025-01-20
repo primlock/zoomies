@@ -60,9 +60,6 @@ type TestConfig struct {
 	// The number of concurrent HTTP request being made to download and upload
 	ConcurrentRequests int
 
-	// The size of the chunk to be downloaded and uploaded in bytes
-	ChunkSize int64
-
 	// Determines whether the unit prefixes are displayed as decimal (Mbps) or binary (Mibit/s)
 	BinaryUnitPrefix bool
 }
@@ -70,7 +67,6 @@ type TestConfig struct {
 var (
 	ErrURLCountOutOfBounds  = errors.New("count must be in the range 1-5 inclusive")
 	ErrUnknownAppToken      = errors.New("invalid token passed as a parameter")
-	ErrChunkSizeOutOfBounds = errors.New("chunk size must be in the range 1-26214400 inclusive")
 	ErrDurationOutOfBounds  = errors.New("duration must be in the range 3-30 inclusive")
 	ErrPingCountOutOfBounds = errors.New("ping must be in the range 1-5 inclusive")
 	ErrNoCandidatesToRank   = errors.New("the candidates object supplied was nil")
@@ -99,7 +95,6 @@ func NewTestConfig() *TestConfig {
 		Duration:           DefaultDuration,
 		PingCount:          DefaultPingCount,
 		ConcurrentRequests: DefaultConcurrentRequests,
-		ChunkSize:          DefaultChunkSize,
 		BinaryUnitPrefix:   DefaultBinaryUnitPrefix,
 	}
 }
@@ -130,7 +125,6 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&params.NoUpload, "noupload", params.NoUpload, "skip the upload test")
 	cmd.Flags().BoolVar(&params.ICMPTest, "icmp", params.ICMPTest, "use icmp to determine RTT, use HTTP if false")
 
-	cmd.Flags().Int64VarP(&params.Config.ChunkSize, "chunk", "n", params.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
 	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time each test should run for (3-30 seconds)")
 	cmd.Flags().IntVarP(&params.Config.PingCount, "pcount", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
 	cmd.Flags().BoolVarP(&params.Config.BinaryUnitPrefix, "binary", "b", params.Config.BinaryUnitPrefix, "display the unit prefixes in binary (Mibit/s) instead of decimal (Mbps)")
@@ -189,10 +183,6 @@ func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
 func cmdValidateE(params *Parameters) error {
 	if params.TestServerCount < 1 || params.TestServerCount > 5 {
 		return ErrURLCountOutOfBounds
-	}
-
-	if params.Config.ChunkSize < 1 || params.Config.ChunkSize > 26214400 {
-		return ErrChunkSizeOutOfBounds
 	}
 
 	if params.Config.Duration < 3 || params.Config.Duration > 30 {
@@ -304,7 +294,7 @@ func runTestSuite(params *Parameters, servers []api.Server) error {
 		if params.NoDownload {
 			pterm.DefaultBasicText.Printf(" %s  Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		} else {
-			if err := runDownloadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.ChunkSize, params.Config.BinaryUnitPrefix); err != nil {
+			if err := runDownloadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, DefaultChunkSize, params.Config.BinaryUnitPrefix); err != nil {
 				return err
 			}
 		}

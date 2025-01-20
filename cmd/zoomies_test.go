@@ -62,32 +62,6 @@ func TestBadToken(t *testing.T) {
 	}
 }
 
-func TestChunkSizeOutOfBounds(t *testing.T) {
-	testCases := []struct {
-		name     string
-		n        int64
-		expected error
-	}{
-		{name: "1", n: 0, expected: ErrChunkSizeOutOfBounds},
-		{name: "2", n: 52428800, expected: ErrChunkSizeOutOfBounds},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewCmd()
-
-			c.SetOutput(&bytes.Buffer{})
-			c.SetArgs([]string{
-				fmt.Sprintf("--chunk=%d", tt.n),
-			})
-
-			got := c.Execute()
-
-			assert.Error(t, got, tt.expected.Error())
-		})
-	}
-}
-
 var mockRTT time.Duration = 20
 
 func mockProbeFunc(server api.Server, count int) (time.Duration, error) {
