@@ -2,6 +2,8 @@
 
 Zoomies is a command line tool that enables performance monitoring of your latency, upload and download speeds through the [fast.com](https://fast.com/) web service. Checkout `docs/papers` for the two inspirational papers that helped provide context for ISP speed tests making this project possible!
 
+!["zoomies - assets/images/zoomes.gif"](assets/images/zoomies.gif)
+
 ### Building the Application
 
 Clone the repository to your local directory:
