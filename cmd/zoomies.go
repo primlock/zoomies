@@ -29,9 +29,6 @@ type Parameters struct {
 	// The endpoint used to gather testing server information.
 	APIEndpointToken string
 
-	// The option to perform an ICMP ping test or HTTP ping test.
-	ICMPTest bool
-
 	// The number of servers to run speed tests on.
 	TestServerCount int
 
@@ -123,7 +120,6 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&params.TestServerCount, "count", "c", params.TestServerCount, "number of servers to perform testing on")
 	cmd.Flags().BoolVar(&params.NoDownload, "nodownload", params.NoDownload, "skip the download test")
 	cmd.Flags().BoolVar(&params.NoUpload, "noupload", params.NoUpload, "skip the upload test")
-	cmd.Flags().BoolVar(&params.ICMPTest, "icmp", params.ICMPTest, "use icmp to determine RTT, use HTTP if false")
 
 	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time each test should run for (3-30 seconds)")
 	cmd.Flags().IntVarP(&params.Config.PingCount, "pcount", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
@@ -165,7 +161,7 @@ func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
 
 		pterm.DefaultBasicText.Printf("Testing from Origin: %s — %s, %s [%s]\n", resp.Client.ISP, resp.Client.Location.City, resp.Client.Location.Country, resp.Client.IP)
 
-		servers, err := getLowestRTTServers(resp.Targets, params.TestServerCount, getProbeFunc(params.ICMPTest))
+		servers, err := getLowestRTTServers(resp.Targets, params.TestServerCount, api.ICMPProbe)
 		if err != nil {
 			return err
 		}
@@ -270,14 +266,6 @@ func getLowestRTTServers(candidates []api.Server, count int, pf api.ProbeFunc) (
 	}
 
 	return servers, nil
-}
-
-func getProbeFunc(opt bool) api.ProbeFunc {
-	if !opt {
-		return api.HTTPProbe
-	}
-
-	return api.ICMPProbe
 }
 
 func runTestSuite(params *Parameters, servers []api.Server) error {
