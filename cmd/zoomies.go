@@ -36,10 +36,10 @@ type Parameters struct {
 	TestServerCount int
 
 	// The option to skip the download speed test.
-	RunDownloadTest bool
+	NoDownload bool
 
 	// The option to skip the upload speed test.
-	RunUploadTest bool
+	NoUpload bool
 
 	// Configurations that apply to download, upload and latency tests.
 	Config *TestConfig
@@ -83,8 +83,8 @@ const (
 	CommandDescription        = "zoomies is a network speed measurement tool"
 	UploadTestPayloadSize     = 25 * 1024 * 1024 // 25 MB
 	DefaultTestServerCount    = 1
-	DefaultRunDownloadTest    = true
-	DefaultRunUploadTest      = true
+	DefaultNoDownload         = false
+	DefaultNoUpload           = false
 	DefaultTimeout            = 30
 	DefaultDuration           = 15
 	DefaultPingCount          = 3
@@ -107,8 +107,8 @@ func NewTestConfig() *TestConfig {
 func NewParameters() *Parameters {
 	return &Parameters{
 		TestServerCount: DefaultTestServerCount,
-		RunDownloadTest: DefaultRunDownloadTest,
-		RunUploadTest:   DefaultRunUploadTest,
+		NoDownload:      DefaultNoDownload,
+		NoUpload:        DefaultNoUpload,
 		Config:          NewTestConfig(),
 		Verbose:         false,
 	}
@@ -126,8 +126,8 @@ func NewCmd() *cobra.Command {
 	// Define the user provided params.
 	cmd.Flags().StringVarP(&params.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
 	cmd.Flags().IntVarP(&params.TestServerCount, "count", "c", params.TestServerCount, "number of servers to perform testing on")
-	cmd.Flags().BoolVar(&params.RunDownloadTest, "download", params.RunDownloadTest, "perform the download test")
-	cmd.Flags().BoolVar(&params.RunUploadTest, "upload", params.RunUploadTest, "perform the upload test")
+	cmd.Flags().BoolVar(&params.NoDownload, "nodownload", params.NoDownload, "skip the download test")
+	cmd.Flags().BoolVar(&params.NoUpload, "noupload", params.NoUpload, "skip the upload test")
 	cmd.Flags().BoolVar(&params.ICMPTest, "icmp", params.ICMPTest, "use icmp to determine RTT, use HTTP if false")
 
 	cmd.Flags().Int64VarP(&params.Config.ChunkSize, "chunk", "n", params.Config.ChunkSize, "size of the download and upload chunk (1-26214400)B")
@@ -155,10 +155,10 @@ func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
 		}
 
 		log.Info(
-			"token: %s, download: %v, upload: %v, duration: %d, binary: %v, verbose: %v\n",
+			"token: %s, nodownload: %v, noupload: %v, duration: %d, binary: %v, verbose: %v\n",
 			params.APIEndpointToken,
-			params.RunDownloadTest,
-			params.RunUploadTest,
+			params.NoDownload,
+			params.NoUpload,
 			params.Config.Duration,
 			params.Config.BinaryUnitPrefix,
 			params.Verbose,
@@ -301,20 +301,20 @@ func runTestSuite(params *Parameters, servers []api.Server) error {
 
 		runLatencyTest(s, params.Config.PingCount)
 
-		if params.RunDownloadTest {
+		if params.NoDownload {
+			pterm.DefaultBasicText.Printf(" %s  Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
+		} else {
 			if err := runDownloadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.ChunkSize, params.Config.BinaryUnitPrefix); err != nil {
 				return err
 			}
-		} else {
-			pterm.DefaultBasicText.Printf(" %s  Download test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 
-		if params.RunUploadTest {
+		if params.NoUpload {
+			pterm.DefaultBasicText.Printf(" %s  Upload test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
+		} else {
 			if err := runUploadTest(s, params.Config.ConcurrentRequests, params.Config.Duration, params.Config.BinaryUnitPrefix); err != nil {
 				return err
 			}
-		} else {
-			pterm.DefaultBasicText.Printf(" %s  Upload test is disabled\n", pterm.ThemeDefault.Checkmark.Unchecked)
 		}
 
 		if i < len(servers)-1 {
