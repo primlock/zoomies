@@ -146,7 +146,7 @@ func TestPingCountOutOfBounds(t *testing.T) {
 
 			c.SetOutput(&bytes.Buffer{})
 			c.SetArgs([]string{
-				fmt.Sprintf("--pcount=%d", tt.count),
+				fmt.Sprintf("--pings=%d", tt.count),
 			})
 
 			got := c.Execute()

@@ -115,8 +115,8 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&params.NoDownload, "nodownload", params.NoDownload, "skip the download test")
 	cmd.Flags().BoolVar(&params.NoUpload, "noupload", params.NoUpload, "skip the upload test")
 
-	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time each test should run for (3-30 seconds)")
-	cmd.Flags().IntVarP(&params.Config.PingCount, "pcount", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
+	cmd.Flags().IntVarP(&params.Config.Duration, "duration", "d", params.Config.Duration, "the length of time the test should run for (3-30 seconds)")
+	cmd.Flags().IntVarP(&params.Config.PingCount, "pings", "p", params.Config.PingCount, "the number of pings sent to the server in the latency test (1-5)")
 	cmd.Flags().BoolVarP(&params.Config.BinaryUnitPrefix, "binary", "b", params.Config.BinaryUnitPrefix, "display the unit prefixes in binary (Mibit/s) instead of decimal (Mbps)")
 	cmd.Flags().BoolVar(&params.Verbose, "verbose", params.Verbose, "provide additional information from the logger")
 
