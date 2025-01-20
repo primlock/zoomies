@@ -29,9 +29,6 @@ type Parameters struct {
 	// The endpoint used to gather testing server information.
 	APIEndpointToken string
 
-	// The number of servers to run speed tests on.
-	TestServerCount int
-
 	// The option to skip the download speed test.
 	NoDownload bool
 
@@ -62,7 +59,6 @@ type TestConfig struct {
 }
 
 var (
-	ErrURLCountOutOfBounds  = errors.New("count must be in the range 1-5 inclusive")
 	ErrUnknownAppToken      = errors.New("invalid token passed as a parameter")
 	ErrDurationOutOfBounds  = errors.New("duration must be in the range 3-30 inclusive")
 	ErrPingCountOutOfBounds = errors.New("ping must be in the range 1-5 inclusive")
@@ -75,7 +71,7 @@ const (
 	CommandName               = "zoomies"
 	CommandDescription        = "zoomies is a network speed measurement tool"
 	UploadTestPayloadSize     = 25 * 1024 * 1024 // 25 MB
-	DefaultTestServerCount    = 1
+	DefaultTestServerCount    = 5
 	DefaultNoDownload         = false
 	DefaultNoUpload           = false
 	DefaultTimeout            = 30
@@ -98,11 +94,10 @@ func NewTestConfig() *TestConfig {
 
 func NewParameters() *Parameters {
 	return &Parameters{
-		TestServerCount: DefaultTestServerCount,
-		NoDownload:      DefaultNoDownload,
-		NoUpload:        DefaultNoUpload,
-		Config:          NewTestConfig(),
-		Verbose:         false,
+		NoDownload: DefaultNoDownload,
+		NoUpload:   DefaultNoUpload,
+		Config:     NewTestConfig(),
+		Verbose:    false,
 	}
 }
 
@@ -117,7 +112,6 @@ func NewCmd() *cobra.Command {
 
 	// Define the user provided params.
 	cmd.Flags().StringVarP(&params.APIEndpointToken, "token", "t", "", "user provided api endpoint access token")
-	cmd.Flags().IntVarP(&params.TestServerCount, "count", "c", params.TestServerCount, "number of servers to perform testing on")
 	cmd.Flags().BoolVar(&params.NoDownload, "nodownload", params.NoDownload, "skip the download test")
 	cmd.Flags().BoolVar(&params.NoUpload, "noupload", params.NoUpload, "skip the upload test")
 
@@ -161,7 +155,7 @@ func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
 
 		pterm.DefaultBasicText.Printf("Testing from Origin: %s — %s, %s [%s]\n", resp.Client.ISP, resp.Client.Location.City, resp.Client.Location.Country, resp.Client.IP)
 
-		servers, err := getLowestRTTServers(resp.Targets, params.TestServerCount, api.ICMPProbe)
+		servers, err := getLowestRTTServers(resp.Targets, DefaultTestServerCount, api.ICMPProbe)
 		if err != nil {
 			return err
 		}
@@ -177,10 +171,6 @@ func cmdRunE(params *Parameters) func(cmd *cobra.Command, args []string) error {
 
 // cmdValidateE validates the parameters the users passes on the command line.
 func cmdValidateE(params *Parameters) error {
-	if params.TestServerCount < 1 || params.TestServerCount > 5 {
-		return ErrURLCountOutOfBounds
-	}
-
 	if params.Config.Duration < 3 || params.Config.Duration > 30 {
 		return ErrDurationOutOfBounds
 	}
@@ -297,6 +287,11 @@ func runTestSuite(params *Parameters, servers []api.Server) error {
 
 		if i < len(servers)-1 {
 			pterm.DefaultBasicText.Printf("\n")
+		}
+
+		// Test only the first server for right now. Intention is to test nearest 3 at the same time and record the results.
+		if true {
+			break
 		}
 	}
 

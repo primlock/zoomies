@@ -11,32 +11,6 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func TestURLCountOutOfBounds(t *testing.T) {
-	testCases := []struct {
-		name     string
-		count    int
-		expected error
-	}{
-		{name: "1", count: 0, expected: ErrURLCountOutOfBounds},
-		{name: "2", count: 6, expected: ErrURLCountOutOfBounds},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewCmd()
-
-			c.SetOutput(&bytes.Buffer{})
-			c.SetArgs([]string{
-				fmt.Sprintf("--count=%d", tt.count),
-			})
-
-			got := c.Execute()
-
-			assert.Error(t, got, tt.expected.Error())
-		})
-	}
-}
-
 func TestBadToken(t *testing.T) {
 	testCases := []struct {
 		name     string
