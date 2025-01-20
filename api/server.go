@@ -57,7 +57,7 @@ var (
 
 var log = logger.TLog
 
-func (s *Server) Download(requests int, chunk int64, duration time.Duration, useBinaryUnitPrefix bool) (float64, error) {
+func (s *Server) Download(requests int, chunk int64, duration time.Duration, useBinaryUnitPrefix bool) error {
 	var totalB uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
@@ -65,7 +65,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 	// Create a default request for downloading the data
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.RangeBasedURL, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to generate http request: %s", err)
+		return fmt.Errorf("failed to generate http request: %s", err)
 	}
 
 	var logs []string
@@ -107,7 +107,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 
 	spinner, err := Spinner.Start()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	updateDisplay := func(start time.Time) {
@@ -146,7 +146,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 				log.Error("%s\n", l)
 			}
 
-			return 0, nil
+			return nil
 		case <-downloadChannel:
 			// Begin another download while not timed out
 			go downloadData()
@@ -154,7 +154,7 @@ func (s *Server) Download(requests int, chunk int64, duration time.Duration, use
 	}
 }
 
-func (s *Server) Upload(requests int, duration time.Duration, payload []byte, useBinaryUnitPrefix bool) (float64, error) {
+func (s *Server) Upload(requests int, duration time.Duration, payload []byte, useBinaryUnitPrefix bool) error {
 	var totalB uint64
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
@@ -193,7 +193,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 
 	spinner, err := Spinner.Start()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	updateDisplay := func(start time.Time) {
@@ -232,7 +232,7 @@ func (s *Server) Upload(requests int, duration time.Duration, payload []byte, us
 				log.Error("%s\n", l)
 			}
 
-			return 0, nil
+			return nil
 		case <-uploadChannel:
 			// Begin another upload while not timed out
 			go uploadData()

@@ -342,7 +342,7 @@ func runDownloadTest(server api.Server, requests, duration int, chunk int64, bin
 		return fmt.Errorf("failed to append chunk size: %s", err)
 	}
 
-	_, err = server.Download(requests, chunk, time.Duration(duration)*time.Second, binary)
+	err = server.Download(requests, chunk, time.Duration(duration)*time.Second, binary)
 	if err != nil {
 		return err
 	}
@@ -358,7 +358,7 @@ func runUploadTest(server api.Server, requests, duration int, binary bool) error
 		return err
 	}
 
-	_, err = server.Upload(requests, time.Duration(duration)*time.Second, payload, binary)
+	err = server.Upload(requests, time.Duration(duration)*time.Second, payload, binary)
 	if err != nil {
 		return err
 	}
